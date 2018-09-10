@@ -42,17 +42,26 @@ type Client struct {
 
 // QueryResult holds the response data from an SOQL query.
 type QueryResult struct {
-	TotalSize int                      `json:"totalSize"`
-	Done      bool                     `json:"done"`
-	Records   []map[string]interface{} `json:"records"`
+	TotalSize      int                      `json:"totalSize"`
+	Done           bool                     `json:"done"`
+	NextRecordsURL string                   `json:"nextRecordsUrl"`
+	Records        []map[string]interface{} `json:"records"`
 }
 
-// Query runs an SOQL query.
+// Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
 func (client *Client) Query(q string) (*QueryResult, error) {
 	if !client.isLoggedIn() {
 		return nil, ErrAuthentication
 	}
-	url := fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, strings.Join(strings.Split(q, " "), "+"))
+
+	var url string
+	if strings.HasPrefix(q, "/services/data") {
+		// q is nextRecordsURL.
+		url = fmt.Sprintf("%s%s", client.baseURL, q)
+	} else {
+		// q is SOQL.
+		url = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, strings.Join(strings.Split(q, " "), "+"))
+	}
 
 	httpClient := http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
@@ -68,6 +77,7 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		return nil, err
 	}
 	if resp.StatusCode != http.StatusOK {
+		log.Println(logPrefix, "http request failed, status code:", resp.StatusCode)
 		return nil, ErrFailure
 	}
 	defer resp.Body.Close()
