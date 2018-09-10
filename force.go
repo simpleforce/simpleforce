@@ -1,6 +1,7 @@
 package simpleforce
 
 import (
+	"encoding/json"
 	"encoding/xml"
 	"fmt"
 	"github.com/pkg/errors"
@@ -21,6 +22,8 @@ const (
 var (
 	// ErrFailure is a generic error if none of the other errors are appropriate.
 	ErrFailure = errors.New("general failure")
+	// ErrAuthentication is returned when authentication failed.
+	ErrAuthentication = errors.New("authentication failure")
 )
 
 // Client is the main instance to access salesforce.
@@ -37,23 +40,64 @@ type Client struct {
 	baseURL    string
 }
 
-// NewClient creates a new instance of the client.
-func NewClient(url, clientID, apiVersion string) *Client {
-	client := &Client{
-		apiVersion: apiVersion,
-		baseURL:    url,
-		clientID:   clientID,
+// QueryResult holds the response data from an SOQL query.
+type QueryResult struct {
+	TotalSize int                      `json:"totalSize"`
+	Done      bool                     `json:"done"`
+	Records   []map[string]interface{} `json:"records"`
+}
+
+// Query runs an SOQL query.
+func (client *Client) Query(q string) (*QueryResult, error) {
+	if !client.isLoggedIn() {
+		return nil, ErrAuthentication
 	}
-	return client
+	url := fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, strings.Join(strings.Split(q, " "), "+"))
+
+	httpClient := http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return nil, ErrFailure
+	}
+	defer resp.Body.Close()
+
+	data, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var result QueryResult
+	err = json.Unmarshal(data, &result)
+	if err != nil {
+		return nil, err
+	}
+
+	return &result, nil
+}
+
+// isLoggedIn returns if the login to salesforce is successful.
+func (client *Client) isLoggedIn() bool {
+	return client.sessionID != ""
 }
 
 // LoginPassword signs into salesforce using password.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_understanding_username_password_oauth_flow.htm
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api.meta/api/sforce_api_calls_login.htm
 func (client *Client) LoginPassword(username, password, token string) error {
-    // Use the SOAP interface to acquire session ID with username, password, and token.
-    // Do not use REST interface here as REST interface seems to have strong checking against client_id, while the SOAP
-    // interface allows a non-exist placeholder client_id to be used.
+	// Use the SOAP interface to acquire session ID with username, password, and token.
+	// Do not use REST interface here as REST interface seems to have strong checking against client_id, while the SOAP
+	// interface allows a non-exist placeholder client_id to be used.
 	soapBody := `<?xml version="1.0" encoding="utf-8" ?>
         <env:Envelope
                 xmlns:xsd="http://www.w3.org/2001/XMLSchema"
@@ -127,4 +171,19 @@ func (client *Client) LoginPassword(username, password, token string) error {
 
 	log.Println(logPrefix, "user", client.user.name, "logged in.")
 	return nil
+}
+
+// NewClient creates a new instance of the client.
+func NewClient(url, clientID, apiVersion string) *Client {
+	client := &Client{
+		apiVersion: apiVersion,
+		baseURL:    url,
+		clientID:   clientID,
+	}
+
+	// Append "/" to the end of baseURL if not yet.
+	if !strings.HasSuffix(client.baseURL, "/") {
+		client.baseURL = client.baseURL + "/"
+	}
+	return client
 }
