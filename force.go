@@ -43,10 +43,10 @@ type Client struct {
 
 // QueryResult holds the response data from an SOQL query.
 type QueryResult struct {
-	TotalSize      int                      `json:"totalSize"`
-	Done           bool                     `json:"done"`
-	NextRecordsURL string                   `json:"nextRecordsUrl"`
-	Records        []map[string]interface{} `json:"records"`
+	TotalSize      int       `json:"totalSize"`
+	Done           bool      `json:"done"`
+	NextRecordsURL string    `json:"nextRecordsUrl"`
+	Records        []SObject `json:"records"`
 }
 
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
@@ -76,6 +76,11 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	}
 
 	return &result, nil
+}
+
+// SObject ...
+func (client *Client) SObject(typeName ...string) *SObject {
+	return nil
 }
 
 // isLoggedIn returns if the login to salesforce is successful.
