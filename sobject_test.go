@@ -84,3 +84,50 @@ func TestSObject_Describe(t *testing.T) {
 		}
 	}
 }
+
+func TestSObject_Get(t *testing.T) {
+	client := requireClient(t, true)
+
+	// Search for a valid Case ID first.
+	queryResult, err := client.Query("SELECT Id,OwnerId,Subject FROM CASE")
+	if err != nil || queryResult == nil {
+		log.Println(logPrefix, "query failed,", err)
+		t.Fail()
+		return
+	}
+	if queryResult.TotalSize < 1 {
+		t.Fail()
+		return
+	}
+	oid := queryResult.Records[0].ID()
+	ownerID := queryResult.Records[0].StringField("OwnerId")
+
+	// Positive
+	obj := client.SObject("Case").Get(oid)
+	if obj.ID() != oid || obj.StringField("OwnerId") != ownerID {
+		t.Fail()
+	}
+
+	// Positive 2
+	obj = client.SObject("Case")
+	if obj.StringField("OwnerId") != "" {
+		t.Fail()
+	}
+	obj.setID(oid)
+	obj.Get()
+	if obj.ID() != oid || obj.StringField("OwnerId") != ownerID {
+		t.Fail()
+	}
+
+	// Negative 1
+	obj = client.SObject("Case").Get("non-exist-id")
+	if obj != nil {
+		t.Fail()
+	}
+
+	// Negative 2
+	obj = &SObject{}
+	if obj.Get() != nil {
+		t.Fail()
+	}
+}

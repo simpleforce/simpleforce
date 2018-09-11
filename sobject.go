@@ -2,6 +2,7 @@ package simpleforce
 
 import (
 	"encoding/json"
+	"log"
 )
 
 const (
@@ -44,9 +45,35 @@ func (obj *SObject) Describe() *SObjectMeta {
 	return &meta
 }
 
-// Get ...
+// Get retrieves all the data fields of an SObject. If id is provided, the SObject with the provided external ID will
+// be retrieved; otherwise, the existing ID of the SObject will be checked. If the SObject doesn't contain an ID field
+// and id is not provided as the parameter, nil is returned.
+// If query is successful, the SObject is updated in-place and exact same address is returned; otherwise, nil is
+// returned if failed.
 func (obj *SObject) Get(id ...string) *SObject {
-	return nil
+	oid := obj.ID()
+	if id != nil {
+		oid = id[0]
+	}
+	if oid == "" {
+		log.Println(logPrefix, "object id not found.")
+		return nil
+	}
+
+	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + oid)
+	data, err := obj.client().httpGet(url)
+	if err != nil {
+		log.Println(logPrefix, "http request failed,", err)
+		return nil
+	}
+
+	err = json.Unmarshal(data, obj)
+	if err != nil {
+		log.Println(logPrefix, "json decode failed,", err)
+		return nil
+	}
+
+	return obj
 }
 
 // Type returns the type, or sometimes referred to as name, of an SObject.
