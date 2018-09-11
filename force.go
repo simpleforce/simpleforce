@@ -38,6 +38,7 @@ type Client struct {
 	clientID   string
 	apiVersion string
 	baseURL    string
+	httpClient *http.Client
 }
 
 // QueryResult holds the response data from an SOQL query.
