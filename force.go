@@ -78,9 +78,14 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	return &result, nil
 }
 
-// SObject ...
+// SObject creates an SObject instance with provided type name and associate the SObject with the client.
 func (client *Client) SObject(typeName ...string) *SObject {
-	return nil
+	obj := &SObject{}
+	obj.setClient(client)
+	if typeName != nil {
+		obj.setType(typeName[0])
+	}
+	return obj
 }
 
 // isLoggedIn returns if the login to salesforce is successful.
@@ -191,6 +196,11 @@ func (client *Client) httpGet(url string) ([]byte, error) {
 	}
 
 	return ioutil.ReadAll(resp.Body)
+}
+
+// makeURL generates a REST API URL based on baseURL, apiVersion of the client.
+func (client *Client) makeURL(req string) string {
+	return client.baseURL + "/services/data/v" + client.apiVersion + "/" + req
 }
 
 // NewClient creates a new instance of the client.

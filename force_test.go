@@ -19,60 +19,54 @@ var (
 	}()
 )
 
-func checkCredentials(t *testing.T) {
+func checkCredentialsAndSkip(t *testing.T) {
 	if sfUser == "" || sfPass == "" || sfToken == "" {
 		log.Println(logPrefix, "SF_USER, SF_PASS, or SF_TOKEN environment variables are not set.")
 		t.Skip()
 	}
 }
 
-func TestLogin(t *testing.T) {
-	checkCredentials(t)
-	log.Printf(logPrefix+" using URL:%s, user:%s, pass:%s, token:%s", sfURL, sfUser, sfPass, sfToken)
-
-	cli := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
-	err := cli.LoginPassword(sfUser, sfPass, sfToken)
-	if err != nil {
-		log.Println(logPrefix, "login failed,", err)
-		t.Fail()
-		return
+func requireClient(t *testing.T, skippable bool) *Client {
+	if skippable {
+		checkCredentialsAndSkip(t)
 	}
-	log.Println("SessionID:", cli.sessionID)
+
+	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
+	if client == nil {
+		t.Fatal()
+	}
+	err := client.LoginPassword(sfUser, sfPass, sfToken)
+	if err != nil {
+		t.Fatal()
+	}
+	return client
 }
 
-func TestQuery(t *testing.T) {
-	checkCredentials(t)
-	log.Printf(logPrefix+" using URL:%s, user:%s, pass:%s, token:%s", sfURL, sfUser, sfPass, sfToken)
+func TestClient_LoginPassword(t *testing.T) {
+	client := requireClient(t, true)
+	log.Println(logPrefix, "SessionID:", client.sessionID)
+}
 
-	cli := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
-	err := cli.LoginPassword(sfUser, sfPass, sfToken)
-	if err != nil {
-		log.Println(logPrefix, "login failed,", err)
-		t.Fail()
-		return
-	}
+func TestClient_Query(t *testing.T) {
+	client := requireClient(t, true)
 
 	q := "SELECT Id,LastModifiedById,LastModifiedDate,ParentId,CommentBody FROM CaseComment"
-	result, err := cli.Query(q)
+	result, err := client.Query(q)
 	if err != nil {
 		log.Println(logPrefix, "query failed,", err)
 		t.Fail()
-		return
 	}
 
-	log.Println(result.TotalSize, result.Done, result.NextRecordsURL)
+	log.Println(logPrefix, result.TotalSize, result.Done, result.NextRecordsURL)
+	if result.TotalSize < 1 {
+		log.Println(logPrefix, "no records returned.")
+		t.Fail()
+	}
 	for _, record := range result.Records {
-		log.Println(record.StringField("Id"), record["LastModifiedById"], record["LastModifiedDate"], record["ParentId"], record["CommentBody"])
-	}
-
-	if result.NextRecordsURL != "" {
-		result, err := cli.Query(result.NextRecordsURL)
-		if err != nil {
-			log.Println(logPrefix, "query more failed,", err)
+		log.Println(logPrefix, record.StringField("Id"), record["LastModifiedById"], record["LastModifiedDate"], record["ParentId"], record["CommentBody"])
+		if record.Type() != "CaseComment" {
 			t.Fail()
-			return
 		}
-		log.Println(result.TotalSize, result.Done, result.NextRecordsURL)
 	}
 }
 

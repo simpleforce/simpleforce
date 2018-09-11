@@ -72,3 +72,15 @@ func TestSObject_SObjectField(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestSObject_Describe(t *testing.T) {
+	client := requireClient(t, true)
+	meta := *client.SObject("Case").Describe()
+	if meta == nil {
+		t.Fail()
+	} else {
+		if meta["name"].(string) != "Case" {
+			t.Fail()
+		}
+	}
+}

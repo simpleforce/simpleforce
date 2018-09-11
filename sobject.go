@@ -1,5 +1,9 @@
 package simpleforce
 
+import (
+	"encoding/json"
+)
+
 const (
 	sobjectClientKey     = "__client__" // private attribute added to locate client instance.
 	sobjectAttributesKey = "attributes" // points to the attributes structure which should be common to all SObjects.
@@ -20,9 +24,24 @@ type SObjectAttributes struct {
 	URL  string `json:"url"`
 }
 
-// Describe ...
+// Describe queries the metadata of an SObject using the "describe" API.
+// Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/resources_sobject_describe.htm
 func (obj *SObject) Describe() *SObjectMeta {
-	return nil
+	if obj.Type() == "" {
+		return nil
+	}
+	url := obj.client().makeURL("sobjects/" + obj.Type() + "/describe")
+	data, err := obj.client().httpGet(url)
+	if err != nil {
+		return nil
+	}
+
+	var meta SObjectMeta
+	err = json.Unmarshal(data, &meta)
+	if err != nil {
+		return nil
+	}
+	return &meta
 }
 
 // Get ...
