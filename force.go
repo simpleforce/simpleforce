@@ -63,26 +63,7 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		url = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, strings.Join(strings.Split(q, " "), "+"))
 	}
 
-	httpClient := http.Client{}
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	if resp.StatusCode != http.StatusOK {
-		log.Println(logPrefix, "http request failed, status code:", resp.StatusCode)
-		return nil, ErrFailure
-	}
-	defer resp.Body.Close()
-
-	data, err := ioutil.ReadAll(resp.Body)
+	data, err := client.httpGet(url)
 	if err != nil {
 		return nil, err
 	}
@@ -183,12 +164,36 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	return nil
 }
 
+// httpGet executes an HTTP GET request to the salesforce server and returns the response data in byte buffer.
+func (client *Client) httpGet(url string) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := client.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, ErrFailure
+	}
+
+	return ioutil.ReadAll(resp.Body)
+}
+
 // NewClient creates a new instance of the client.
 func NewClient(url, clientID, apiVersion string) *Client {
 	client := &Client{
 		apiVersion: apiVersion,
 		baseURL:    url,
 		clientID:   clientID,
+		httpClient: &http.Client{},
 	}
 
 	// Append "/" to the end of baseURL if not yet.

@@ -10,10 +10,26 @@ var (
 	sfUser  = os.ExpandEnv("${SF_USER}")
 	sfPass  = os.ExpandEnv("${SF_PASS}")
 	sfToken = os.ExpandEnv("${SF_TOKEN}")
-	sfURL   = os.ExpandEnv("${SF_URL}")
+	sfURL   = func() string {
+		if os.ExpandEnv("${SF_URL}") != "" {
+			return os.ExpandEnv("${SF_URL}")
+		} else {
+			return DefaultURL
+		}
+	}()
 )
 
+func checkCredentials(t *testing.T) {
+	if sfUser == "" || sfPass == "" || sfToken == "" {
+		log.Println(logPrefix, "SF_USER, SF_PASS, or SF_TOKEN environment variables are not set.")
+		t.Skip()
+	}
+}
+
 func TestLogin(t *testing.T) {
+	checkCredentials(t)
+	log.Printf(logPrefix+" using URL:%s, user:%s, pass:%s, token:%s", sfURL, sfUser, sfPass, sfToken)
+
 	cli := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
 	err := cli.LoginPassword(sfUser, sfPass, sfToken)
 	if err != nil {
@@ -25,6 +41,9 @@ func TestLogin(t *testing.T) {
 }
 
 func TestQuery(t *testing.T) {
+	checkCredentials(t)
+	log.Printf(logPrefix+" using URL:%s, user:%s, pass:%s, token:%s", sfURL, sfUser, sfPass, sfToken)
+
 	cli := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
 	err := cli.LoginPassword(sfUser, sfPass, sfToken)
 	if err != nil {
@@ -43,7 +62,7 @@ func TestQuery(t *testing.T) {
 
 	log.Println(result.TotalSize, result.Done, result.NextRecordsURL)
 	for _, record := range result.Records {
-		log.Println(record["Id"], record["LastModifiedById"], record["LastModifiedDate"], record["ParentId"], record["CommentBody"])
+		log.Println(record.StringField("Id"), record["LastModifiedById"], record["LastModifiedDate"], record["ParentId"], record["CommentBody"])
 	}
 
 	if result.NextRecordsURL != "" {
@@ -58,15 +77,5 @@ func TestQuery(t *testing.T) {
 }
 
 func TestMain(m *testing.M) {
-	if sfUser == "" || sfPass == "" || sfToken == "" {
-		log.Println(logPrefix, "SF_USER, SF_PASS, or SF_TOKEN environment variables are not set.")
-		return
-	}
-
-	if sfURL == "" {
-		sfURL = DefaultURL
-	}
-	log.Printf(logPrefix+" using URL:%s, user:%s, pass:%s, token:%s", sfURL, sfUser, sfPass, sfToken)
-
 	m.Run()
 }
