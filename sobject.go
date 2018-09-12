@@ -129,7 +129,33 @@ func (obj *SObject) Create() *SObject {
 	return obj
 }
 
-	return result
+// Update updates SObject in place. Upon successful, same SObject is returned for chained access.
+// ID is required.
+func (obj *SObject) Update() *SObject {
+	if obj.Type() == "" || obj.client() == nil || obj.ID() == "" {
+		// Sanity check.
+		return nil
+	}
+
+	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
+	reqObj := obj.makeCopy()
+	reqData, err := json.Marshal(reqObj)
+	if err != nil {
+		log.Println(logPrefix, "failed to convert sobject to json,", err)
+		return nil
+	}
+
+	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + obj.ID())
+	log.Println(url)
+	log.Println(string(reqData))
+	respData, err := obj.client().httpRequest("PATCH", url, bytes.NewReader(reqData))
+	if err != nil {
+		log.Println(logPrefix, "failed to process http request,", err)
+		return nil
+	}
+	log.Println(string(respData))
+
+	return obj
 }
 
 // Type returns the type, or sometimes referred to as name, of an SObject.

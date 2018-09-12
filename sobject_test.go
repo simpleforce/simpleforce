@@ -183,3 +183,18 @@ func TestSObject_Create(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestSObject_Update(t *testing.T) {
+	client := requireClient(t, true)
+
+	// Positive
+	if client.SObject("Case").
+		Set("Subject", "Case created by simpleforce on "+time.Now().Format("2006/01/02 03:04:05")).
+		Create().
+		Set("Subject", "Case subject updated by simpleforce").
+		Update().
+		Get().
+		StringField("Subject") != "Case subject updated by simpleforce" {
+		t.Fail()
+	}
+}
