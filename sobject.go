@@ -84,8 +84,8 @@ func (obj *SObject) Get(id ...string) *SObject {
 }
 
 // Create posts the JSON representation of the SObject to salesforce to create the entry.
-// If the creation is successful, a new SObject instance is returned with the external ID and type of the created
-// object; <nil> is returned if the creation is failed.
+// If the creation is successful, the ID of the SObject instance is updated with the ID returned. Otherwise, nil is
+// returned for failures.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_sobject_create.htm
 func (obj *SObject) Create() *SObject {
 	if obj.Type() == "" || obj.client() == nil {
@@ -125,11 +125,9 @@ func (obj *SObject) Create() *SObject {
 		return nil
 	}
 
-	// Upon successful invocation, a new SObject with client, ID, and Type configured is returned.
-	result := &SObject{}
-	result.setClient(obj.client())
-	result.setType(obj.Type())
-	result.setID(respVal.ID)
+	obj.setID(respVal.ID)
+	return obj
+}
 
 	return result
 }
