@@ -93,7 +93,7 @@ func (client *Client) isLoggedIn() bool {
 	return client.sessionID != ""
 }
 
-// LoginPassword signs into salesforce using password.
+// LoginPassword signs into salesforce using password. token is optional if trusted IP is configured.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_understanding_username_password_oauth_flow.htm
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api.meta/api/sforce_api_calls_login.htm
 func (client *Client) LoginPassword(username, password, token string) error {

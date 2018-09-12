@@ -20,8 +20,8 @@ var (
 )
 
 func checkCredentialsAndSkip(t *testing.T) {
-	if sfUser == "" || sfPass == "" || sfToken == "" {
-		log.Println(logPrefix, "SF_USER, SF_PASS, or SF_TOKEN environment variables are not set.")
+	if sfUser == "" || sfPass == "" {
+		log.Println(logPrefix, "SF_USER, SF_PASS environment variables are not set.")
 		t.Skip()
 	}
 }
@@ -43,8 +43,42 @@ func requireClient(t *testing.T, skippable bool) *Client {
 }
 
 func TestClient_LoginPassword(t *testing.T) {
-	client := requireClient(t, true)
-	log.Println(logPrefix, "SessionID:", client.sessionID)
+	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
+	if client == nil {
+		t.Fatal()
+	}
+
+	// Use token
+	err := client.LoginPassword(sfUser, sfPass, sfToken)
+	if err != nil {
+		t.Fatal()
+	} else {
+		log.Println(logPrefix, "sessionID:", client.sessionID)
+	}
+
+	err = client.LoginPassword("__INVALID_USER__", "__INVALID_PASS__", "__INVALID_TOKEN__")
+	if err == nil {
+		t.Fail()
+	}
+}
+
+func TestClient_LoginPasswordNoToken(t *testing.T) {
+	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
+	if client == nil {
+		t.Fatal()
+	}
+
+	// Trusted IP must be configured AND the request must be initiated from the trusted IP range.
+	err := client.LoginPassword(sfUser, sfPass, "")
+	if err != nil {
+		t.Fatal()
+	} else {
+		log.Println(logPrefix, "sessionID:", client.sessionID)
+	}
+}
+
+func TestClient_LoginOAuth(t *testing.T) {
+
 }
 
 func TestClient_Query(t *testing.T) {
