@@ -33,7 +33,7 @@ func requireClient(t *testing.T, skippable bool) *Client {
 
 	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
 	if client == nil {
-		t.Fatal()
+		t.Fail()
 	}
 	err := client.LoginPassword(sfUser, sfPass, sfToken)
 	if err != nil {
@@ -43,6 +43,8 @@ func requireClient(t *testing.T, skippable bool) *Client {
 }
 
 func TestClient_LoginPassword(t *testing.T) {
+	checkCredentialsAndSkip(t)
+
 	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
 	if client == nil {
 		t.Fatal()
@@ -51,7 +53,7 @@ func TestClient_LoginPassword(t *testing.T) {
 	// Use token
 	err := client.LoginPassword(sfUser, sfPass, sfToken)
 	if err != nil {
-		t.Fatal()
+		t.Fail()
 	} else {
 		log.Println(logPrefix, "sessionID:", client.sessionID)
 	}
@@ -63,6 +65,8 @@ func TestClient_LoginPassword(t *testing.T) {
 }
 
 func TestClient_LoginPasswordNoToken(t *testing.T) {
+	checkCredentialsAndSkip(t)
+
 	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
 	if client == nil {
 		t.Fatal()
