@@ -65,7 +65,7 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		url = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, strings.Join(strings.Split(q, " "), "+"))
 	}
 
-	data, err := client.httpGet(url)
+	data, err := client.httpRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -176,33 +176,9 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	return nil
 }
 
-// httpGet executes an HTTP GET request to the salesforce server and returns the response data in byte buffer.
-func (client *Client) httpGet(url string) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
-	req.Header.Add("Content-Type", "application/json")
-
-	resp, err := client.httpClient.Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		log.Println(logPrefix, "status:", resp.StatusCode)
-		return nil, ErrFailure
-	}
-
-	return ioutil.ReadAll(resp.Body)
-}
-
-// httpPost executes an HTTP POST request to the salesforce server and returns the response data in byte buffer.
-func (client *Client) httpPost(url string, body io.Reader) ([]byte, error) {
-	req, err := http.NewRequest(http.MethodPost, url, body)
+// httpRequest executes an HTTP request to the salesforce server and returns the response data in byte buffer.
+func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
 	}
