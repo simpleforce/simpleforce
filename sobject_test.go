@@ -198,3 +198,24 @@ func TestSObject_Update(t *testing.T) {
 		t.Fail()
 	}
 }
+
+func TestSObject_Delete(t *testing.T) {
+	client := requireClient(t, true)
+
+	// Positive: create a case first then delete it and verify if it is gone.
+	case1 := client.SObject("Case").
+		Set("Subject", "Case created by simpleforce on "+time.Now().Format("2006/01/02 03:04:05")).
+		Create().
+		Get()
+	if case1 == nil || case1.ID() == "" {
+		t.Fatal()
+	}
+	caseID := case1.ID()
+	if case1.Delete() != nil {
+		t.Fail()
+	}
+	case1 = client.SObject("Case").Get(caseID)
+	if case1 != nil {
+		t.Fail()
+	}
+}

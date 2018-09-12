@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"log"
+	"net/http"
 )
 
 const (
@@ -34,7 +35,7 @@ func (obj *SObject) Describe() *SObjectMeta {
 		return nil
 	}
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/describe")
-	data, err := obj.client().httpRequest("GET", url, nil)
+	data, err := obj.client().httpRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil
 	}
@@ -68,7 +69,7 @@ func (obj *SObject) Get(id ...string) *SObject {
 	}
 
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + oid)
-	data, err := obj.client().httpRequest("GET", url, nil)
+	data, err := obj.client().httpRequest(http.MethodGet, url, nil)
 	if err != nil {
 		log.Println(logPrefix, "http request failed,", err)
 		return nil
@@ -102,7 +103,7 @@ func (obj *SObject) Create() *SObject {
 	}
 
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/")
-	respData, err := obj.client().httpRequest("POST", url, bytes.NewReader(reqData))
+	respData, err := obj.client().httpRequest(http.MethodPost, url, bytes.NewReader(reqData))
 	if err != nil {
 		log.Println(logPrefix, "failed to process http request,", err)
 		return nil
@@ -146,9 +147,7 @@ func (obj *SObject) Update() *SObject {
 	}
 
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + obj.ID())
-	log.Println(url)
-	log.Println(string(reqData))
-	respData, err := obj.client().httpRequest("PATCH", url, bytes.NewReader(reqData))
+	respData, err := obj.client().httpRequest(http.MethodPatch, url, bytes.NewReader(reqData))
 	if err != nil {
 		log.Println(logPrefix, "failed to process http request,", err)
 		return nil
@@ -156,6 +155,32 @@ func (obj *SObject) Update() *SObject {
 	log.Println(string(respData))
 
 	return obj
+}
+
+// Delete deletes an SObject record identified by external ID. nil is returned if the operation completes successfully;
+// otherwise an error is returned
+func (obj *SObject) Delete(id ...string) error {
+	if obj.Type() == "" || obj.client() == nil {
+		// Sanity check
+		return ErrFailure
+	}
+
+	oid := obj.ID()
+	if id != nil {
+		oid = id[0]
+	}
+	if oid == "" {
+		return ErrFailure
+	}
+
+	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + obj.ID())
+	log.Println(url)
+	_, err := obj.client().httpRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // Type returns the type, or sometimes referred to as name, of an SObject.
