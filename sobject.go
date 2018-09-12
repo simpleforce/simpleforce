@@ -1,6 +1,7 @@
 package simpleforce
 
 import (
+	"bytes"
 	"encoding/json"
 	"log"
 )
@@ -28,7 +29,8 @@ type SObjectAttributes struct {
 // Describe queries the metadata of an SObject using the "describe" API.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/resources_sobject_describe.htm
 func (obj *SObject) Describe() *SObjectMeta {
-	if obj.Type() == "" {
+	if obj.Type() == "" || obj.client() == nil {
+		// Sanity check.
 		return nil
 	}
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/describe")
@@ -51,6 +53,11 @@ func (obj *SObject) Describe() *SObjectMeta {
 // If query is successful, the SObject is updated in-place and exact same address is returned; otherwise, nil is
 // returned if failed.
 func (obj *SObject) Get(id ...string) *SObject {
+	if obj.Type() == "" || obj.client() == nil {
+		// Sanity check.
+		return nil
+	}
+
 	oid := obj.ID()
 	if id != nil {
 		oid = id[0]
@@ -74,6 +81,65 @@ func (obj *SObject) Get(id ...string) *SObject {
 	}
 
 	return obj
+}
+
+// Create posts the JSON representation of the SObject to salesforce to create the entry.
+// If the creation is successful, a new SObject instance is returned with the external ID and type of the created
+// object; <nil> is returned if the creation is failed.
+// Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_sobject_create.htm
+func (obj *SObject) Create() *SObject {
+	if obj.Type() == "" || obj.client() == nil {
+		// Sanity check.
+		return nil
+	}
+
+	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
+	reqObj := make(map[string]interface{})
+	for key, val := range *obj {
+		if key == sobjectClientKey ||
+			key == sobjectAttributesKey ||
+			key == sobjectIDKey {
+			continue
+		}
+		reqObj[key] = val
+	}
+	reqData, err := json.Marshal(reqObj)
+	if err != nil {
+		log.Println(logPrefix, "failed to convert sobject to json,", err)
+		return nil
+	}
+
+	url := obj.client().makeURL("sobjects/" + obj.Type() + "/")
+	respData, err := obj.client().httpPost(url, bytes.NewReader(reqData))
+	if err != nil {
+		log.Println(logPrefix, "failed to process http request,", err)
+		return nil
+	}
+
+	// Use an anonymous struct to parse the result if any. This might need to be changed if the result should
+	// be returned to the caller in some manner, especially if the client would like to decode the errors.
+	var respVal struct {
+		ID      string `json:"id"`
+		Success bool   `json:"success"`
+	}
+	err = json.Unmarshal(respData, &respVal)
+	if err != nil {
+		log.Println(logPrefix, "failed to process response data,", err)
+		return nil
+	}
+
+	if !respVal.Success || respVal.ID == "" {
+		log.Println(logPrefix, "unsuccessful")
+		return nil
+	}
+
+	// Upon successful invocation, a new SObject with client, ID, and Type configured is returned.
+	result := &SObject{}
+	result.setClient(obj.client())
+	result.setType(obj.Type())
+	result.setID(respVal.ID)
+
+	return result
 }
 
 // Type returns the type, or sometimes referred to as name, of an SObject.
@@ -133,6 +199,13 @@ func (obj *SObject) AttributesField() *SObjectAttributes {
 	default:
 		return nil
 	}
+}
+
+// Set indexes value into SObject instance with provided key. The same SObject pointer is returned to allow
+// chained access.
+func (obj *SObject) Set(key string, value interface{}) *SObject {
+	(*obj)[key] = value
+	return obj
 }
 
 // client returns the associated Client with the SObject.

@@ -5,6 +5,7 @@ import (
 	"encoding/xml"
 	"fmt"
 	"github.com/pkg/errors"
+	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
@@ -192,6 +193,31 @@ func (client *Client) httpGet(url string) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
+		log.Println(logPrefix, "status:", resp.StatusCode)
+		return nil, ErrFailure
+	}
+
+	return ioutil.ReadAll(resp.Body)
+}
+
+// httpPost executes an HTTP POST request to the salesforce server and returns the response data in byte buffer.
+func (client *Client) httpPost(url string, body io.Reader) ([]byte, error) {
+	req, err := http.NewRequest(http.MethodPost, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
+	req.Header.Add("Content-Type", "application/json")
+
+	resp, err := client.httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		log.Println(logPrefix, "status:", resp.StatusCode)
 		return nil, ErrFailure
 	}
 

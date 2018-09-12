@@ -3,6 +3,7 @@ package simpleforce
 import (
 	"log"
 	"testing"
+	"time"
 )
 
 func TestSObject_AttributesField(t *testing.T) {
@@ -128,6 +129,57 @@ func TestSObject_Get(t *testing.T) {
 	// Negative 2
 	obj = &SObject{}
 	if obj.Get() != nil {
+		t.Fail()
+	}
+}
+
+func TestSObject_Create(t *testing.T) {
+	client := requireClient(t, true)
+
+	// Positive
+	case1 := client.SObject("Case")
+	case1Result := case1.Set("Subject", "Case created by simpleforce on "+time.Now().Format("2006/01/02 03:04:05")).
+		Set("Comments", "This case is created by simpleforce").
+		Create()
+	if case1Result == nil || case1Result.ID() == "" || case1Result.Type() != case1.Type() {
+		t.Fail()
+	} else {
+		log.Println(logPrefix, "Case created,", case1Result.Get().StringField("CaseNumber"))
+	}
+
+	// Positive 2
+	caseComment1 := client.SObject("CaseComment")
+	caseComment1Result := caseComment1.Set("ParentId", case1Result.ID()).
+		Set("CommentBody", "This comment is created by simpleforce").
+		Set("IsPublished", true).
+		Create()
+	if caseComment1Result.Get().SObjectField("Case", "ParentId").ID() != case1Result.ID() {
+		t.Fail()
+	} else {
+		log.Println(logPrefix, "CaseComment created,", caseComment1Result.ID())
+	}
+
+	// Negative: object without type.
+	obj := client.SObject()
+	if obj.Create() != nil {
+		t.Fail()
+	}
+
+	// Negative: object without client.
+	obj = &SObject{}
+	if obj.Create() != nil {
+		t.Fail()
+	}
+
+	// Negative: Invalid type
+	obj = client.SObject("__SOME_INVALID_TYPE__")
+	if obj.Create() != nil {
+		t.Fail()
+	}
+
+	// Negative: Invalid field
+	obj = client.SObject("Case").Set("__SOME_INVALID_FIELD__", "")
+	if obj.Create() != nil {
 		t.Fail()
 	}
 }
