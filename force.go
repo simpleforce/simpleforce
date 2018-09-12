@@ -202,7 +202,7 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 
 // makeURL generates a REST API URL based on baseURL, apiVersion of the client.
 func (client *Client) makeURL(req string) string {
-	return client.baseURL + "/services/data/v" + client.apiVersion + "/" + req
+	return client.baseURL + "services/data/v" + client.apiVersion + "/" + req
 }
 
 // NewClient creates a new instance of the client.
