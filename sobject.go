@@ -94,15 +94,7 @@ func (obj *SObject) Create() *SObject {
 	}
 
 	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
-	reqObj := make(map[string]interface{})
-	for key, val := range *obj {
-		if key == sobjectClientKey ||
-			key == sobjectAttributesKey ||
-			key == sobjectIDKey {
-			continue
-		}
-		reqObj[key] = val
-	}
+	reqObj := obj.makeCopy()
 	reqData, err := json.Marshal(reqObj)
 	if err != nil {
 		log.Println(logPrefix, "failed to convert sobject to json,", err)
@@ -242,4 +234,18 @@ func (obj *SObject) setType(typeName string) {
 // setID sets the external ID for the SObject.
 func (obj *SObject) setID(id string) {
 	(*obj)[sobjectIDKey] = id
+}
+
+// makeCopy copies the fields of an SObject to a new map without metadata fields.
+func (obj *SObject) makeCopy() map[string]interface{} {
+	stripped := make(map[string]interface{})
+	for key, val := range *obj {
+		if key == sobjectClientKey ||
+			key == sobjectAttributesKey ||
+			key == sobjectIDKey {
+			continue
+		}
+		stripped[key] = val
+	}
+	return stripped
 }
