@@ -183,11 +183,23 @@ func (obj *SObject) InterfaceField(key string) interface{} {
 // AttributesField returns a read-only copy of the attributes field of an SObject.
 func (obj *SObject) AttributesField() *SObjectAttributes {
 	attributes := obj.InterfaceField(sobjectAttributesKey)
+
 	switch attributes.(type) {
 	case SObjectAttributes:
 		// Use a temporary variable to copy the value of attributes and return the address of the temp value.
 		attrs := (attributes).(SObjectAttributes)
 		return &attrs
+	case map[string]interface{}:
+		// Can't convert attributes to concrete type; decode interface.
+		mapper := attributes.(map[string]interface{})
+		attrs := &SObjectAttributes{}
+		if mapper["type"] != nil {
+			attrs.Type = mapper["type"].(string)
+		}
+		if mapper["url"] != nil {
+			attrs.URL = mapper["url"].(string)
+		}
+		return attrs
 	default:
 		return nil
 	}
