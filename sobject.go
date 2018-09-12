@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"strings"
 )
 
 const (
@@ -211,15 +212,49 @@ func (obj *SObject) StringField(key string) string {
 // SObjectField accesses a field in the SObject as another SObject. This is only applicable if the field is an external
 // ID to another object. The typeName of the SObject must be provided. <nil> is returned if the field is empty.
 func (obj *SObject) SObjectField(typeName, key string) *SObject {
+	// First check if there's an associated ID directly.
 	oid := obj.StringField(key)
-	if oid == "" {
+	if oid != "" {
+		object := &SObject{}
+		object.setClient(obj.client())
+		object.setType(typeName)
+		object.setID(oid)
+		return object
+	}
+
+	// Secondly, check if this could be a linked object, which doesn't have an ID but has the attributes.
+	linkedObjRaw := obj.InterfaceField(key)
+	linkedObjMapper, ok := linkedObjRaw.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	attrs, ok := linkedObjMapper[sobjectAttributesKey].(map[string]interface{})
+	if !ok {
 		return nil
 	}
 
-	object := &SObject{}
-	object.setClient(obj.client())
-	object.setType(typeName)
+	// Reusing typeName here, which is ok
+	typeName, ok = attrs["type"].(string)
+	url, ok := attrs["url"].(string)
+	if typeName == "" || url == "" {
+		return nil
+	}
+
+	// Both type and url exist in attributes, this is a linked object!
+	// Get the ID from URL.
+	rIndex := strings.LastIndex(url, "/")
+	if rIndex == -1 || rIndex+1 == len(url) {
+		// hmm... this shouldn't happen, unless the URL is hand crafted.
+		log.Println(logPrefix, "invalid url,", url)
+		return nil
+	}
+	oid = url[rIndex+1:]
+
+	object := obj.client().SObject(typeName)
 	object.setID(oid)
+	for key, val := range linkedObjMapper {
+		object.Set(key, val)
+	}
 
 	return object
 }

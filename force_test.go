@@ -107,6 +107,23 @@ func TestClient_Query(t *testing.T) {
 	}
 }
 
+func TestClient_Query2(t *testing.T) {
+	client := requireClient(t, true)
+
+	q := "Select+id,createdbyid,parentid,parent.casenumber,parent.subject,createdby.name,createdby.alias+from+casecomment"
+	result, err := client.Query(q)
+	if err != nil {
+		t.Fail()
+	}
+
+	comment1 := &result.Records[0]
+	case1 := comment1.SObjectField("Case", "Parent").Get()
+	if comment1.StringField("ParentId") != case1.ID() {
+		t.Fail()
+	}
+
+}
+
 func TestMain(m *testing.M) {
 	m.Run()
 }

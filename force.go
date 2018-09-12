@@ -76,6 +76,11 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		return nil, err
 	}
 
+	// Reference to client is needed if the object will be further used to do online queries.
+	for idx := range result.Records {
+		result.Records[idx].setClient(client)
+	}
+
 	return &result, nil
 }
 
