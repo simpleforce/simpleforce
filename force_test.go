@@ -101,7 +101,6 @@ func TestClient_Query(t *testing.T) {
 		t.Fail()
 	}
 	for _, record := range result.Records {
-		log.Println(logPrefix, record.StringField("Id"), record["LastModifiedById"], record["LastModifiedDate"], record["ParentId"], record["CommentBody"])
 		if record.Type() != "CaseComment" {
 			t.Fail()
 		}
