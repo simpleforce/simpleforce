@@ -1,4 +1,174 @@
-# Simple Golang client for Salesforce
+## Simple Golang client for Salesforce
 
+`simpleforce` is a library written in Go (Golang) that provides basic read and write to Salesforce objects via REST API.
+Currently, the following functions are implemented and more features could be added based on needs:
 
+* Login using username, password, and security token.
+* Execute SOQL queries.
+* Get records via record (sobject) type and ID.
+* Create records.
+* Update records.
+* Delete records. 
 
+Most of the implementation referenced Salesforce documentation here: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_what_is_rest_api.htm
+
+### Installation
+
+`simpleforce` can be acquired as any other Go libraries via `go get`:
+
+```
+go get github.com/simpleforce/simpleforce
+```
+
+### Quick Start
+
+A `client` instance is the main entrance to access Salesforce using simpleforce. Create a `client` instance with the
+`NewClient` function, with the proper endpoint URL:
+
+```go
+package main
+
+import "github.com/simpleforce/simpleforce"
+
+var (
+	sfURL      = "Custom or instance URL, for example, 'https://na01.salesforce.com/'"
+	sfUser     = "Username of the Salesforce account."
+	sfPassword = "Password of the Salesforce account."
+	sfToken    = "Security token, could be omitted if Trusted IP is configured."
+)
+
+func creteClient() *simpleforce.Client {
+	client := simpleforce.NewClient(sfURL, simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
+	if client == nil {
+		// handle the error
+
+		return nil
+	}
+    
+	err := client.LoginPassword(sfUser, sfPassword, sfToken)
+	if err != nil {
+		// handle the error
+
+		return nil
+	}
+    
+	// Do some other stuff with the client instance if needed.
+
+	return client
+}
+```
+
+### Execute an SOQL Query
+
+The `client` provides an interface to run an SOQL Query. Refer to 
+https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/dome_query.htm
+for more details about SOQL.
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/simpleforce/simpleforce"
+)
+
+func Query() {
+	client := simpleforce.NewClient(...)
+	client.LoginPassword(...)
+
+	q := "Some SOQL Query String"
+	result, err := client.Query(q)
+	if err != nil {
+		// handle the error
+		return
+	}
+
+	for _, record := range result.Records {
+		// access the record as SObjects.
+		fmt.Println(record)
+	}
+}
+
+```
+
+### Work with Records
+
+`SObject` instances are created by `client` instance, either through the return values of `client.Query()`
+or through `client.SObject()` directly. Once an `SObject` instance is created, it can be used to Create, Delete, Update,
+or Get records through the Salesforce REST API. Here are some examples of using `SObject` instances to work on the
+records.
+
+```go
+package main
+
+import (
+    "fmt"
+    "github.com/simpleforce/simpleforce"
+)
+
+func WorkWithRecords() {
+	client := simpleforce.NewClient(...)
+	client.LoginPassword(...)
+	
+	// Get an SObject with given type and external ID
+	obj := client.SObject("Case").Get("__ID__")
+	if obj == nil {
+		// Object doesn't exist, handle the error
+		return
+	}
+	
+	// Attributes are associated with all Salesforce returned SObjects, and can be accessed with the
+	// `AttributesField` method.
+	attrs := obj.AttributesField()
+	if attrs != nil {
+	 	fmt.Println(attrs.Type)    // "Case" 
+		fmt.Println(attrs.URL)     // "/services/data/v43.0/case/__ID__"
+	}
+	
+	// Linked objects can be accessed with the `SObjectField` method.
+	userObj := obj.SObjectField("User", "CreatedById")
+	if userObj == nil {
+		// Object doesn't exist, or field "CreatedById" is invalid.
+		return
+	}
+	
+	// Linked objects returned normally contains the type and ID field only. A `Get` operation is needed to
+	// retrieve all the information of linked objects.
+	fmt.Println(userObj.StringField("Name"))    // FAIL: fields are not populated.
+	
+	// If an SObject instance already has an ID (e.g. linked object), `Get` can retrieve the object directly without
+	// parameter.
+	userObj.Get()
+	fmt.Println(userObj.StringField("Name"))    // SUCCESS: returns the name of the user.
+	
+	// Many SObject methods return the instance of the SObject, allowing chained access and operations to the
+	// object. In the following example, all methods, except "Delete", returns *SObject so that the next method
+	// can be invoked on the returned value directly.
+	//
+	// Delete() methods returns `error` instead, as Delete is supposed to delete the record from the server.
+	err := client.SObject("Case").                               // Create an empty object of type "Case"
+    		Set("Subject", "Case created by simpleforce").              // Set the "Subject" field.
+	        Set("Comments", "Case commented by simpleforce").           // Set the "Comments" field.
+    		Create().                                                   // Create the record on Salesforce server.
+    		Set("Subject", "Case subject updated by simpleforce").      // Modify the "Subject" field.
+    		Update().                                                   // Update the record on Salesforce server.
+    		Get().                                                      // Refresh the fields from Salesforce server.
+    		Delete()                                                    // Delete the record from Salesforce server.
+	fmt.Println(err)	
+}
+
+```
+
+### Development and Unit Test
+
+A set of unit test cases are provided to validate the basic functions of simpleforce. Please do not run these 
+unit tests with a production instance of Salesforce as it would create, modify and delete data from the provided
+Salesforce account.
+
+### License and Acknowledgement
+
+This package is released under BSD license. Part of the code referenced the simple-salesforce
+(https://github.com/simple-salesforce/simple-salesforce) project and the credit goes to Nick Catalano and the community
+maintaining simple-salesforce.
+
+Contributions are welcome, cheers :-)
