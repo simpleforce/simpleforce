@@ -1,5 +1,7 @@
 ## Simple Golang client for Salesforce
 
+[![GoDoc](https://godoc.org/github.com/simpleforce/simpleforce?status.svg)](https://godoc.org/github.com/simpleforce/simpleforce)
+
 `simpleforce` is a library written in Go (Golang) that provides basic read and write to Salesforce objects via REST API.
 Currently, the following functions are implemented and more features could be added based on needs:
 
