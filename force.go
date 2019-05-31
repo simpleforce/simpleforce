@@ -137,8 +137,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	req.Header.Add("charset", "UTF-8")
 	req.Header.Add("SOAPAction", "login")
 
-	httpClient := &http.Client{}
-	resp, err := httpClient.Do(req)
+	resp, err := client.httpClient.Do(req)
 	if err != nil {
 		log.Println(logPrefix, "error occurred submitting request,", err)
 		return err
