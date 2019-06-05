@@ -4,12 +4,14 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/pkg/errors"
 	"io"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -56,16 +58,16 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		return nil, ErrAuthentication
 	}
 
-	var url string
+	var u string
 	if strings.HasPrefix(q, "/services/data") {
 		// q is nextRecordsURL.
-		url = fmt.Sprintf("%s%s", client.baseURL, q)
+		u = fmt.Sprintf("%s%s", client.baseURL, q)
 	} else {
 		// q is SOQL.
-		url = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, strings.Join(strings.Split(q, " "), "+"))
+		u = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, url.PathEscape(q))
 	}
 
-	data, err := client.httpRequest("GET", url, nil)
+	data, err := client.httpRequest("GET", u, nil)
 	if err != nil {
 		return nil, err
 	}
