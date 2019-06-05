@@ -76,11 +76,11 @@ func TestSObject_SObjectField(t *testing.T) {
 
 func TestSObject_Describe(t *testing.T) {
 	client := requireClient(t, true)
-	meta := *client.SObject("Case").Describe()
+	meta := client.SObject("Case").Describe()
 	if meta == nil {
-		t.Fail()
+		t.FailNow()
 	} else {
-		if meta["name"].(string) != "Case" {
+		if (*meta)["name"].(string) != "Case" {
 			t.Fail()
 		}
 	}

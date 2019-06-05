@@ -75,7 +75,7 @@ func TestClient_LoginPasswordNoToken(t *testing.T) {
 	// Trusted IP must be configured AND the request must be initiated from the trusted IP range.
 	err := client.LoginPassword(sfUser, sfPass, "")
 	if err != nil {
-		t.Fatal()
+		t.FailNow()
 	} else {
 		log.Println(logPrefix, "sessionID:", client.sessionID)
 	}
@@ -92,13 +92,13 @@ func TestClient_Query(t *testing.T) {
 	result, err := client.Query(q)
 	if err != nil {
 		log.Println(logPrefix, "query failed,", err)
-		t.Fail()
+		t.FailNow()
 	}
 
 	log.Println(logPrefix, result.TotalSize, result.Done, result.NextRecordsURL)
 	if result.TotalSize < 1 {
 		log.Println(logPrefix, "no records returned.")
-		t.Fail()
+		t.FailNow()
 	}
 	for _, record := range result.Records {
 		if record.Type() != "CaseComment" {
@@ -113,13 +113,14 @@ func TestClient_Query2(t *testing.T) {
 	q := "Select+id,createdbyid,parentid,parent.casenumber,parent.subject,createdby.name,createdby.alias+from+casecomment"
 	result, err := client.Query(q)
 	if err != nil {
-		t.Fail()
+		t.FailNow()
 	}
-
-	comment1 := &result.Records[0]
-	case1 := comment1.SObjectField("Case", "Parent").Get()
-	if comment1.StringField("ParentId") != case1.ID() {
-		t.Fail()
+	if len(result.Records) > 0 {
+		comment1 := &result.Records[0]
+		case1 := comment1.SObjectField("Case", "Parent").Get()
+		if comment1.StringField("ParentId") != case1.ID() {
+			t.Fail()
+		}
 	}
 
 }
