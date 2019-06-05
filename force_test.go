@@ -3,6 +3,7 @@ package simpleforce
 import (
 	"log"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -122,7 +123,22 @@ func TestClient_Query2(t *testing.T) {
 			t.Fail()
 		}
 	}
+}
 
+func TestClient_QueryLike(t *testing.T) {
+	client := requireClient(t, true)
+
+	q := "Select Id, createdby.name, subject from case where subject like '%simpleforce%'"
+	result, err := client.Query(q)
+	if err != nil {
+		t.FailNow()
+	}
+	if len(result.Records) > 0 {
+		case0 := &result.Records[0]
+		if !strings.Contains(case0.StringField("Subject"), "simpleforce") {
+			t.FailNow()
+		}
+	}
 }
 
 func TestMain(m *testing.M) {

@@ -93,12 +93,10 @@ func TestSObject_Get(t *testing.T) {
 	queryResult, err := client.Query("SELECT Id,OwnerId,Subject FROM CASE")
 	if err != nil || queryResult == nil {
 		log.Println(logPrefix, "query failed,", err)
-		t.Fail()
-		return
+		t.FailNow()
 	}
 	if queryResult.TotalSize < 1 {
-		t.Fail()
-		return
+		t.FailNow()
 	}
 	oid := queryResult.Records[0].ID()
 	ownerID := queryResult.Records[0].StringField("OwnerId")
