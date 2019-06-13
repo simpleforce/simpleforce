@@ -31,16 +31,16 @@ var (
 
 // Client is the main instance to access salesforce.
 type Client struct {
-	sessionID string
-	user      struct {
-		id       string
-		name     string
-		fullName string
-		email    string
+	SessionID string
+	User      struct {
+		ID       string
+		Name     string
+		FullName string
+		Email    string
 	}
-	clientID   string
-	apiVersion string
-	baseURL    string
+	ClientID   string
+	ApiVersion string
+	BaseURL    string
 	httpClient *http.Client
 }
 
@@ -61,10 +61,10 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	var u string
 	if strings.HasPrefix(q, "/services/data") {
 		// q is nextRecordsURL.
-		u = fmt.Sprintf("%s%s", client.baseURL, q)
+		u = fmt.Sprintf("%s%s", client.BaseURL, q)
 	} else {
 		// q is SOQL.
-		u = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, url.PathEscape(q))
+		u = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.BaseURL, client.ApiVersion, url.PathEscape(q))
 	}
 
 	data, err := client.httpRequest("GET", u, nil)
@@ -98,7 +98,7 @@ func (client *Client) SObject(typeName ...string) *SObject {
 
 // isLoggedIn returns if the login to salesforce is successful.
 func (client *Client) isLoggedIn() bool {
-	return client.sessionID != ""
+	return client.SessionID != ""
 }
 
 // LoginPassword signs into salesforce using password. token is optional if trusted IP is configured.
@@ -127,9 +127,9 @@ func (client *Client) LoginPassword(username, password, token string) error {
                 </n1:login>
             </env:Body>
         </env:Envelope>`
-	soapBody = fmt.Sprintf(soapBody, client.clientID, username, password, token)
+	soapBody = fmt.Sprintf(soapBody, client.ClientID, username, password, token)
 
-	url := fmt.Sprintf("%s/services/Soap/u/%s", client.baseURL, client.apiVersion)
+	url := fmt.Sprintf("%s/services/Soap/u/%s", client.BaseURL, client.ApiVersion)
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(soapBody))
 	if err != nil {
 		log.Println(logPrefix, "error occurred creating request,", err)
@@ -172,13 +172,13 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	}
 
 	// Now we should all be good and the sessionID can be used to talk to salesforce further.
-	client.sessionID = loginResponse.SessionID
-	client.user.id = loginResponse.UserID
-	client.user.name = loginResponse.UserName
-	client.user.email = loginResponse.UserEmail
-	client.user.fullName = loginResponse.UserFullName
+	client.SessionID = loginResponse.SessionID
+	client.User.ID = loginResponse.UserID
+	client.User.Name = loginResponse.UserName
+	client.User.Email = loginResponse.UserEmail
+	client.User.FullName = loginResponse.UserFullName
 
-	log.Println(logPrefix, "user", client.user.name, "logged in.")
+	log.Println(logPrefix, "User", client.User.Name, "logged in.")
 	return nil
 }
 
@@ -189,7 +189,7 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.SessionID))
 	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := client.httpClient.Do(req)
@@ -208,21 +208,21 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 
 // makeURL generates a REST API URL based on baseURL, apiVersion of the client.
 func (client *Client) makeURL(req string) string {
-	return client.baseURL + "services/data/v" + client.apiVersion + "/" + req
+	return client.BaseURL + "services/data/v" + client.ApiVersion + "/" + req
 }
 
 // NewClient creates a new instance of the client.
 func NewClient(url, clientID, apiVersion string) *Client {
 	client := &Client{
-		apiVersion: apiVersion,
-		baseURL:    url,
-		clientID:   clientID,
+		ApiVersion: apiVersion,
+		BaseURL:    url,
+		ClientID:   clientID,
 		httpClient: &http.Client{},
 	}
 
 	// Append "/" to the end of baseURL if not yet.
-	if !strings.HasSuffix(client.baseURL, "/") {
-		client.baseURL = client.baseURL + "/"
+	if !strings.HasSuffix(client.BaseURL, "/") {
+		client.BaseURL = client.BaseURL + "/"
 	}
 	return client
 }

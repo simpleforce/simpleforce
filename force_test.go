@@ -56,7 +56,7 @@ func TestClient_LoginPassword(t *testing.T) {
 	if err != nil {
 		t.Fail()
 	} else {
-		log.Println(logPrefix, "sessionID:", client.sessionID)
+		log.Println(logPrefix, "sessionID:", client.SessionID)
 	}
 
 	err = client.LoginPassword("__INVALID_USER__", "__INVALID_PASS__", "__INVALID_TOKEN__")
@@ -78,7 +78,7 @@ func TestClient_LoginPasswordNoToken(t *testing.T) {
 	if err != nil {
 		t.FailNow()
 	} else {
-		log.Println(logPrefix, "sessionID:", client.sessionID)
+		log.Println(logPrefix, "sessionID:", client.SessionID)
 	}
 }
 
