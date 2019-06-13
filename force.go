@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -229,4 +230,36 @@ func NewClient(url, clientID, apiVersion string) *Client {
 
 func (client *Client) SetHttpClient(c *http.Client) {
 	client.HTTPClient = c
+}
+
+// DownloadFile downloads a file based on the REST API path given. Saves to filePath.
+func (client *Client) DownloadFile(APIPath string, filepath string) error {
+
+	baseURL := strings.TrimRight(client.BaseURL, "/")
+	url := fmt.Sprintf("%s%s", baseURL, APIPath)
+
+	// Get the data
+	httpClient := client.HTTPClient
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
+	req.Header.Add("Accept", "applicationn/json")
+	req.Header.Add("Authorization", "Bearer "+client.SessionID)
+
+	// resp, err := http.Get(url)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return err
 }
