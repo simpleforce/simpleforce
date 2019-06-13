@@ -39,9 +39,9 @@ type Client struct {
 		Email    string
 	}
 	ClientID   string
-	ApiVersion string
+	APIVersion string
 	BaseURL    string
-	httpClient *http.Client
+	HTTPClient *http.Client
 }
 
 // QueryResult holds the response data from an SOQL query.
@@ -64,7 +64,7 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		u = fmt.Sprintf("%s%s", client.BaseURL, q)
 	} else {
 		// q is SOQL.
-		u = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.BaseURL, client.ApiVersion, url.PathEscape(q))
+		u = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.BaseURL, client.APIVersion, url.PathEscape(q))
 	}
 
 	data, err := client.httpRequest("GET", u, nil)
@@ -129,7 +129,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
         </env:Envelope>`
 	soapBody = fmt.Sprintf(soapBody, client.ClientID, username, password, token)
 
-	url := fmt.Sprintf("%s/services/Soap/u/%s", client.BaseURL, client.ApiVersion)
+	url := fmt.Sprintf("%s/services/Soap/u/%s", client.BaseURL, client.APIVersion)
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(soapBody))
 	if err != nil {
 		log.Println(logPrefix, "error occurred creating request,", err)
@@ -139,7 +139,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	req.Header.Add("charset", "UTF-8")
 	req.Header.Add("SOAPAction", "login")
 
-	resp, err := client.httpClient.Do(req)
+	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
 		log.Println(logPrefix, "error occurred submitting request,", err)
 		return err
@@ -192,7 +192,7 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.SessionID))
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := client.httpClient.Do(req)
+	resp, err := client.HTTPClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -206,18 +206,18 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 	return ioutil.ReadAll(resp.Body)
 }
 
-// makeURL generates a REST API URL based on baseURL, apiVersion of the client.
+// makeURL generates a REST API URL based on baseURL, APIVersion of the client.
 func (client *Client) makeURL(req string) string {
-	return client.BaseURL + "services/data/v" + client.ApiVersion + "/" + req
+	return client.BaseURL + "services/data/v" + client.APIVersion + "/" + req
 }
 
 // NewClient creates a new instance of the client.
 func NewClient(url, clientID, apiVersion string) *Client {
 	client := &Client{
-		ApiVersion: apiVersion,
+		APIVersion: apiVersion,
 		BaseURL:    url,
 		ClientID:   clientID,
-		httpClient: &http.Client{},
+		HTTPClient: &http.Client{},
 	}
 
 	// Append "/" to the end of baseURL if not yet.
@@ -228,5 +228,5 @@ func NewClient(url, clientID, apiVersion string) *Client {
 }
 
 func (client *Client) SetHttpClient(c *http.Client) {
-	client.httpClient = c
+	client.HTTPClient = c
 }
