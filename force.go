@@ -54,7 +54,7 @@ type QueryResult struct {
 }
 
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
-func (client *Client) Query(q string) (*QueryResult, error) {
+func (client *Client) Query(q string, toolingAPI bool) (*QueryResult, error) {
 	if !client.isLoggedIn() {
 		return nil, ErrAuthentication
 	}
@@ -65,7 +65,11 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		u = fmt.Sprintf("%s%s", client.BaseURL, q)
 	} else {
 		// q is SOQL.
-		u = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.BaseURL, client.APIVersion, url.PathEscape(q))
+		formatString := "%sservices/data/v%s/query?q=%s"
+		if toolingAPI {
+			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
+		}
+		u = fmt.Sprintf(formatString, client.BaseURL, client.APIVersion, url.PathEscape(q))
 	}
 
 	data, err := client.httpRequest("GET", u, nil)
