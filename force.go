@@ -65,7 +65,7 @@ func (client *Client) Query(q string, toolingAPI bool) (*QueryResult, error) {
 		u = fmt.Sprintf("%s%s", client.BaseURL, q)
 	} else {
 		// q is SOQL.
-		formatString := "%sservices/data/v%s/query?q=%s"
+		formatString := "%s/services/data/v%s/query?q=%s"
 		if toolingAPI {
 			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
 		}
@@ -158,7 +158,6 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	}
 
 	respData, err := ioutil.ReadAll(resp.Body)
-	log.Println("respData:", string(respData))
 
 	if err != nil {
 		log.Println(logPrefix, "error occurred reading response data,", err)
@@ -171,6 +170,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 		UserEmail    string   `xml:"Body>loginResponse>result>userInfo>userEmail"`
 		UserFullName string   `xml:"Body>loginResponse>result>userInfo>userFullName"`
 		UserName     string   `xml:"Body>loginResponse>result>userInfo>userName"`
+		ServerURL    string   `xml:"Body>loginResponse>result>serverUrl"`
 	}
 
 	err = xml.Unmarshal(respData, &loginResponse)
@@ -179,8 +179,11 @@ func (client *Client) LoginPassword(username, password, token string) error {
 		return err
 	}
 
+	serverURLParts := strings.Split(loginResponse.ServerURL, "/")
+
 	// Now we should all be good and the sessionID can be used to talk to salesforce further.
 	client.SessionID = loginResponse.SessionID
+	client.BaseURL = fmt.Sprintf("%s//%s", serverURLParts[0], serverURLParts[1])
 	client.User.ID = loginResponse.UserID
 	client.User.Name = loginResponse.UserName
 	client.User.Email = loginResponse.UserEmail
@@ -249,7 +252,7 @@ func (client *Client) DownloadFile(APIPath string, filepath string) error {
 	httpClient := client.HTTPClient
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
-	req.Header.Add("Accept", "applicationn/json")
+	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Authorization", "Bearer "+client.SessionID)
 
 	// resp, err := http.Get(url)
