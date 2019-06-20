@@ -74,6 +74,7 @@ func (client *Client) Query(q string, toolingAPI bool) (*QueryResult, error) {
 
 	data, err := client.httpRequest("GET", u, nil)
 	if err != nil {
+		log.Println("HTTP GET request failed:", u)
 		return nil, err
 	}
 
