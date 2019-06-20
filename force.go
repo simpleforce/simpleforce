@@ -168,12 +168,12 @@ func (client *Client) LoginPassword(username, password, token string) error {
 
 	var loginResponse struct {
 		XMLName      xml.Name `xml:"Envelope"`
+		ServerURL    string   `xml:"Body>loginResponse>result>serverUrl"`
 		SessionID    string   `xml:"Body>loginResponse>result>sessionId"`
 		UserID       string   `xml:"Body>loginResponse>result>userId"`
 		UserEmail    string   `xml:"Body>loginResponse>result>userInfo>userEmail"`
 		UserFullName string   `xml:"Body>loginResponse>result>userInfo>userFullName"`
 		UserName     string   `xml:"Body>loginResponse>result>userInfo>userName"`
-		ServerURL    string   `xml:"Body>loginResponse>result>serverUrl"`
 	}
 
 	err = xml.Unmarshal(respData, &loginResponse)
