@@ -158,6 +158,8 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	}
 
 	respData, err := ioutil.ReadAll(resp.Body)
+	log.Println("respData:", string(respData))
+
 	if err != nil {
 		log.Println(logPrefix, "error occurred reading response data,", err)
 	}
