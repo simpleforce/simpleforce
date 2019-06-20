@@ -39,10 +39,11 @@ type Client struct {
 		FullName string
 		Email    string
 	}
-	ClientID   string
-	APIVersion string
-	BaseURL    string
-	HTTPClient *http.Client
+	ClientID    string
+	APIVersion  string
+	BaseURL     string
+	InstanceURL string
+	HTTPClient  *http.Client
 }
 
 // QueryResult holds the response data from an SOQL query.
@@ -66,10 +67,12 @@ func (client *Client) Query(q string, toolingAPI bool) (*QueryResult, error) {
 	} else {
 		// q is SOQL.
 		formatString := "%s/services/data/v%s/query?q=%s"
+		baseURL := client.BaseURL
 		if toolingAPI {
 			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
+			baseURL = client.InstanceURL
 		}
-		u = fmt.Sprintf(formatString, client.BaseURL, client.APIVersion, url.PathEscape(q))
+		u = fmt.Sprintf(formatString, baseURL, client.APIVersion, url.PathEscape(q))
 	}
 
 	data, err := client.httpRequest("GET", u, nil)
@@ -183,7 +186,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 
 	// Now we should all be good and the sessionID can be used to talk to salesforce further.
 	client.SessionID = loginResponse.SessionID
-	client.BaseURL = fmt.Sprintf("%s//%s", serverURLParts[0], serverURLParts[1])
+	client.InstanceURL = fmt.Sprintf("%s//%s", serverURLParts[0], serverURLParts[1])
 	client.User.ID = loginResponse.UserID
 	client.User.Name = loginResponse.UserName
 	client.User.Email = loginResponse.UserEmail
