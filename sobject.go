@@ -3,6 +3,7 @@ package simpleforce
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -147,7 +148,12 @@ func (obj *SObject) Update() *SObject {
 		return nil
 	}
 
-	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + obj.ID())
+	queryBase := "sobjects/"
+	if obj.client().useToolingAPI {
+		queryBase = "tooling/sobjects/"
+	}
+	url := obj.client().makeURL(queryBase + obj.Type() + "/" + obj.ID())
+	fmt.Println(url)
 	respData, err := obj.client().httpRequest(http.MethodPatch, url, bytes.NewReader(reqData))
 	if err != nil {
 		log.Println(logPrefix, "failed to process http request,", err)

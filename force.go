@@ -39,11 +39,12 @@ type Client struct {
 		FullName string
 		Email    string
 	}
-	ClientID    string
-	APIVersion  string
-	BaseURL     string
-	InstanceURL string
-	HTTPClient  *http.Client
+	ClientID      string
+	APIVersion    string
+	BaseURL       string
+	InstanceURL   string
+	useToolingAPI bool
+	HTTPClient    *http.Client
 }
 
 // QueryResult holds the response data from an SOQL query.
@@ -54,8 +55,14 @@ type QueryResult struct {
 	Records        []SObject `json:"records"`
 }
 
+// Tooling is called to specify Tooling API, e.g. client.Tooling().Query(q)
+func (client *Client) Tooling() *Client {
+	client.useToolingAPI = true
+	return client
+}
+
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
-func (client *Client) Query(q string, toolingAPI bool) (*QueryResult, error) {
+func (client *Client) Query(q string) (*QueryResult, error) {
 	if !client.isLoggedIn() {
 		return nil, ErrAuthentication
 	}
@@ -68,7 +75,7 @@ func (client *Client) Query(q string, toolingAPI bool) (*QueryResult, error) {
 		// q is SOQL.
 		formatString := "%s/services/data/v%s/query?q=%s"
 		baseURL := client.BaseURL
-		if toolingAPI {
+		if client.useToolingAPI {
 			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
 			baseURL = client.InstanceURL
 		}
@@ -220,7 +227,10 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 
 // makeURL generates a REST API URL based on baseURL, APIVersion of the client.
 func (client *Client) makeURL(req string) string {
-	return client.BaseURL + "services/data/v" + client.APIVersion + "/" + req
+	retURL := fmt.Sprintf("%s/services/data/v%s/%s", client.InstanceURL, client.APIVersion, req)
+	// Fix potential problems
+	retURL = strings.Replace(retURL, "vv", "v", -1)
+	return retURL
 }
 
 // NewClient creates a new instance of the client.
