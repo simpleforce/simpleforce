@@ -32,19 +32,19 @@ var (
 
 // Client is the main instance to access salesforce.
 type Client struct {
-	SessionID string
-	User      struct {
-		ID       string
-		Name     string
-		FullName string
-		Email    string
+	sessionID string
+	user      struct {
+		id       string
+		name     string
+		fullName string
+		email    string
 	}
-	ClientID      string
-	APIVersion    string
-	BaseURL       string
-	InstanceURL   string
+	clientID      string
+	apiVersion    string
+	baseURL       string
+	instanceURL   string
 	useToolingAPI bool
-	HTTPClient    *http.Client
+	httpClient    *http.Client
 }
 
 // QueryResult holds the response data from an SOQL query.
@@ -70,16 +70,16 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	var u string
 	if strings.HasPrefix(q, "/services/data") {
 		// q is nextRecordsURL.
-		u = fmt.Sprintf("%s%s", client.BaseURL, q)
+		u = fmt.Sprintf("%s%s", client.baseURL, q)
 	} else {
 		// q is SOQL.
 		formatString := "%s/services/data/v%s/query?q=%s"
-		baseURL := client.BaseURL
+		baseURL := client.baseURL
 		if client.useToolingAPI {
 			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
-			baseURL = client.InstanceURL
+			baseURL = client.instanceURL
 		}
-		u = fmt.Sprintf(formatString, baseURL, client.APIVersion, url.PathEscape(q))
+		u = fmt.Sprintf(formatString, baseURL, client.apiVersion, url.PathEscape(q))
 	}
 
 	data, err := client.httpRequest("GET", u, nil)
@@ -114,7 +114,7 @@ func (client *Client) SObject(typeName ...string) *SObject {
 
 // isLoggedIn returns if the login to salesforce is successful.
 func (client *Client) isLoggedIn() bool {
-	return client.SessionID != ""
+	return client.sessionID != ""
 }
 
 // LoginPassword signs into salesforce using password. token is optional if trusted IP is configured.
@@ -143,9 +143,9 @@ func (client *Client) LoginPassword(username, password, token string) error {
                 </n1:login>
             </env:Body>
         </env:Envelope>`
-	soapBody = fmt.Sprintf(soapBody, client.ClientID, username, password, token)
+	soapBody = fmt.Sprintf(soapBody, client.clientID, username, password, token)
 
-	url := fmt.Sprintf("%s/services/Soap/u/%s", client.BaseURL, client.APIVersion)
+	url := fmt.Sprintf("%s/services/Soap/u/%s", client.baseURL, client.apiVersion)
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(soapBody))
 	if err != nil {
 		log.Println(logPrefix, "error occurred creating request,", err)
@@ -155,7 +155,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	req.Header.Add("charset", "UTF-8")
 	req.Header.Add("SOAPAction", "login")
 
-	resp, err := client.HTTPClient.Do(req)
+	resp, err := client.httpClient.Do(req)
 	if err != nil {
 		log.Println(logPrefix, "error occurred submitting request,", err)
 		return err
@@ -190,14 +190,14 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	}
 
 	// Now we should all be good and the sessionID can be used to talk to salesforce further.
-	client.SessionID = loginResponse.SessionID
-	client.InstanceURL = parseHost(loginResponse.ServerURL)
-	client.User.ID = loginResponse.UserID
-	client.User.Name = loginResponse.UserName
-	client.User.Email = loginResponse.UserEmail
-	client.User.FullName = loginResponse.UserFullName
+	client.sessionID = loginResponse.SessionID
+	client.instanceURL = parseHost(loginResponse.ServerURL)
+	client.user.id = loginResponse.UserID
+	client.user.name = loginResponse.UserName
+	client.user.email = loginResponse.UserEmail
+	client.user.fullName = loginResponse.UserFullName
 
-	log.Println(logPrefix, "User", client.User.Name, "logged in.")
+	log.Println("User", client.user.name, "authenticated.")
 	return nil
 }
 
@@ -208,10 +208,10 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.SessionID))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := client.HTTPClient.Do(req)
+	resp, err := client.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -227,7 +227,7 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 
 // makeURL generates a REST API URL based on baseURL, APIVersion of the client.
 func (client *Client) makeURL(req string) string {
-	retURL := fmt.Sprintf("%s/services/data/v%s/%s", client.InstanceURL, client.APIVersion, req)
+	retURL := fmt.Sprintf("%s/services/data/v%s/%s", client.instanceURL, client.apiVersion, req)
 	// Fix potential problems
 	retURL = strings.Replace(retURL, "vv", "v", -1)
 	return retURL
@@ -236,35 +236,35 @@ func (client *Client) makeURL(req string) string {
 // NewClient creates a new instance of the client.
 func NewClient(url, clientID, apiVersion string) *Client {
 	client := &Client{
-		APIVersion: apiVersion,
-		BaseURL:    url,
-		ClientID:   clientID,
-		HTTPClient: &http.Client{},
+		apiVersion: apiVersion,
+		baseURL:    url,
+		clientID:   clientID,
+		httpClient: &http.Client{},
 	}
 
 	// Append "/" to the end of baseURL if not yet.
-	if !strings.HasSuffix(client.BaseURL, "/") {
-		client.BaseURL = client.BaseURL + "/"
+	if !strings.HasSuffix(client.baseURL, "/") {
+		client.baseURL = client.baseURL + "/"
 	}
 	return client
 }
 
 func (client *Client) SetHttpClient(c *http.Client) {
-	client.HTTPClient = c
+	client.httpClient = c
 }
 
 // DownloadFile downloads a file based on the REST API path given. Saves to filePath.
 func (client *Client) DownloadFile(APIPath string, filepath string) error {
 
-	baseURL := strings.TrimRight(client.BaseURL, "/")
+	baseURL := strings.TrimRight(client.baseURL, "/")
 	url := fmt.Sprintf("%s%s", baseURL, APIPath)
 
 	// Get the data
-	httpClient := client.HTTPClient
+	httpClient := client.httpClient
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", "Bearer "+client.SessionID)
+	req.Header.Add("Authorization", "Bearer "+client.sessionID)
 
 	// resp, err := http.Get(url)
 	resp, err := httpClient.Do(req)
