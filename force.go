@@ -74,10 +74,9 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	} else {
 		// q is SOQL.
 		formatString := "%s/services/data/v%s/query?q=%s"
-		baseURL := client.baseURL
+		baseURL := client.instanceURL
 		if client.useToolingAPI {
 			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
-			baseURL = client.instanceURL
 		}
 		u = fmt.Sprintf(formatString, baseURL, client.apiVersion, url.PathEscape(q))
 	}
