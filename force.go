@@ -9,6 +9,7 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 
 	"github.com/pkg/errors"
@@ -38,10 +39,12 @@ type Client struct {
 		fullName string
 		email    string
 	}
-	clientID   string
-	apiVersion string
-	baseURL    string
-	httpClient *http.Client
+	clientID      string
+	apiVersion    string
+	baseURL       string
+	instanceURL   string
+	useToolingAPI bool
+	httpClient    *http.Client
 }
 
 // QueryResult holds the response data from an SOQL query.
@@ -50,6 +53,12 @@ type QueryResult struct {
 	Done           bool      `json:"done"`
 	NextRecordsURL string    `json:"nextRecordsUrl"`
 	Records        []SObject `json:"records"`
+}
+
+// Tooling is called to specify Tooling API, e.g. client.Tooling().Query(q)
+func (client *Client) Tooling() *Client {
+	client.useToolingAPI = true
+	return client
 }
 
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
@@ -64,11 +73,17 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		u = fmt.Sprintf("%s%s", client.baseURL, q)
 	} else {
 		// q is SOQL.
-		u = fmt.Sprintf("%sservices/data/v%s/query?q=%s", client.baseURL, client.apiVersion, url.PathEscape(q))
+		formatString := "%s/services/data/v%s/query?q=%s"
+		baseURL := client.instanceURL
+		if client.useToolingAPI {
+			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
+		}
+		u = fmt.Sprintf(formatString, baseURL, client.apiVersion, url.PathEscape(q))
 	}
 
 	data, err := client.httpRequest("GET", u, nil)
 	if err != nil {
+		log.Println("HTTP GET request failed:", u)
 		return nil, err
 	}
 
@@ -152,12 +167,14 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	}
 
 	respData, err := ioutil.ReadAll(resp.Body)
+
 	if err != nil {
 		log.Println(logPrefix, "error occurred reading response data,", err)
 	}
 
 	var loginResponse struct {
 		XMLName      xml.Name `xml:"Envelope"`
+		ServerURL    string   `xml:"Body>loginResponse>result>serverUrl"`
 		SessionID    string   `xml:"Body>loginResponse>result>sessionId"`
 		UserID       string   `xml:"Body>loginResponse>result>userId"`
 		UserEmail    string   `xml:"Body>loginResponse>result>userInfo>userEmail"`
@@ -173,12 +190,13 @@ func (client *Client) LoginPassword(username, password, token string) error {
 
 	// Now we should all be good and the sessionID can be used to talk to salesforce further.
 	client.sessionID = loginResponse.SessionID
+	client.instanceURL = parseHost(loginResponse.ServerURL)
 	client.user.id = loginResponse.UserID
 	client.user.name = loginResponse.UserName
 	client.user.email = loginResponse.UserEmail
 	client.user.fullName = loginResponse.UserFullName
 
-	log.Println(logPrefix, "user", client.user.name, "logged in.")
+	log.Println("User", client.user.name, "authenticated.")
 	return nil
 }
 
@@ -206,9 +224,12 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 	return ioutil.ReadAll(resp.Body)
 }
 
-// makeURL generates a REST API URL based on baseURL, apiVersion of the client.
+// makeURL generates a REST API URL based on baseURL, APIVersion of the client.
 func (client *Client) makeURL(req string) string {
-	return client.baseURL + "services/data/v" + client.apiVersion + "/" + req
+	retURL := fmt.Sprintf("%s/services/data/v%s/%s", client.instanceURL, client.apiVersion, req)
+	// Fix potential problems
+	retURL = strings.Replace(retURL, "vv", "v", -1)
+	return retURL
 }
 
 // NewClient creates a new instance of the client.
@@ -229,4 +250,44 @@ func NewClient(url, clientID, apiVersion string) *Client {
 
 func (client *Client) SetHttpClient(c *http.Client) {
 	client.httpClient = c
+}
+
+// DownloadFile downloads a file based on the REST API path given. Saves to filePath.
+func (client *Client) DownloadFile(APIPath string, filepath string) error {
+
+	baseURL := strings.TrimRight(client.baseURL, "/")
+	url := fmt.Sprintf("%s%s", baseURL, APIPath)
+
+	// Get the data
+	httpClient := client.httpClient
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", "Bearer "+client.sessionID)
+
+	// resp, err := http.Get(url)
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	// Create the file
+	out, err := os.Create(filepath)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	// Write the body to file
+	_, err = io.Copy(out, resp.Body)
+	return err
+}
+
+func parseHost(input string) string {
+	parsed, err := url.Parse(input)
+	if err == nil {
+		return fmt.Sprintf("%s://%s", parsed.Scheme, parsed.Host)
+	}
+	return "Failed to parse URL input"
 }
