@@ -1,5 +1,7 @@
 # simpleforce
 
+A simple Golang client for Salesforce
+
 [![GoDoc](https://godoc.org/github.com/simpleforce/simpleforce?status.svg)](https://godoc.org/github.com/simpleforce/simpleforce)
 
 ## Features
