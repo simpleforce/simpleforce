@@ -1,20 +1,23 @@
-## Simple Golang client for Salesforce
+# simpleforce
 
 [![GoDoc](https://godoc.org/github.com/simpleforce/simpleforce?status.svg)](https://godoc.org/github.com/simpleforce/simpleforce)
 
-`simpleforce` is a library written in Go (Golang) that provides basic read and write to Salesforce objects via REST API.
-Currently, the following functions are implemented and more features could be added based on needs:
+## Features
 
-* Login using username, password, and security token.
-* Execute SOQL queries.
-* Get records via record (sobject) type and ID.
-* Create records.
-* Update records.
-* Delete records. 
+`simpleforce` is a library written in Go (Golang) that connects to Salesforce via the REST and Tooling APIs.
+Currently, the following functions are implemented and more features could be added based on need:
+
+* Execute SOQL queries
+* Get records via record (sobject) type and ID
+* Create records
+* Update records
+* Delete records
+* Download a file
+* Execute anonymous apex
 
 Most of the implementation referenced Salesforce documentation here: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_what_is_rest_api.htm
 
-### Installation
+## Installation
 
 `simpleforce` can be acquired as any other Go libraries via `go get`:
 
@@ -22,7 +25,9 @@ Most of the implementation referenced Salesforce documentation here: https://dev
 go get github.com/simpleforce/simpleforce
 ```
 
-### Quick Start
+## Quick Start
+
+### Setup the Client
 
 A `client` instance is the main entrance to access Salesforce using simpleforce. Create a `client` instance with the
 `NewClient` function, with the proper endpoint URL:
@@ -60,7 +65,7 @@ func creteClient() *simpleforce.Client {
 }
 ```
 
-### Execute an SOQL Query
+### Execute a SOQL Query
 
 The `client` provides an interface to run an SOQL Query. Refer to 
 https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/dome_query.htm
@@ -79,7 +84,7 @@ func Query() {
 	client.LoginPassword(...)
 
 	q := "Some SOQL Query String"
-	result, err := client.Query(q)
+	result, err := client.Query(q) // Note: for Tooling API, use client.Tooling().Query(q)
 	if err != nil {
 		// handle the error
 		return
@@ -158,16 +163,53 @@ func WorkWithRecords() {
     		Delete()                                                    // Delete the record from Salesforce server.
 	fmt.Println(err)	
 }
-
 ```
 
-### Development and Unit Test
+### Download a File
+```go
+// Setup client and login
+// ...
+
+// Get the content version ID
+query := "SELECT Id FROM ContentVersion WHERE ContentDocumentId = '" + YOUR_CONTENTDOCUMENTID + "' AND IsLatest = true"
+result, err = client.Query(query)
+if err != nil {
+    // handle the error
+}
+contentVersionID := ""
+for _, record := range result.Records {
+    contentVersionID = record.StringField("Id")
+}
+
+// Download file
+downloadFilePath := "/absolute/path/to/yourfile.txt"
+
+err = client.DownloadFile(contentVersionID, downloadFilePath)
+if err != nil {
+    // handle error
+    return
+}   
+```
+
+### Execute Anonymous Apex
+```go
+// Setup client and login
+// ...
+
+result, err := client.ExecuteAnonymous("System.debug('test anonymous apex');")
+if err != nil {
+    // handle error
+    return
+}
+```
+
+## Development and Unit Test
 
 A set of unit test cases are provided to validate the basic functions of simpleforce. Please do not run these 
 unit tests with a production instance of Salesforce as it would create, modify and delete data from the provided
 Salesforce account.
 
-### License and Acknowledgement
+## License and Acknowledgement
 
 This package is released under BSD license. Part of the code referenced the simple-salesforce
 (https://github.com/simple-salesforce/simple-salesforce) project and the credit goes to Nick Catalano and the community
