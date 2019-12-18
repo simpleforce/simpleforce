@@ -55,12 +55,6 @@ type QueryResult struct {
 	Records        []SObject `json:"records"`
 }
 
-// Tooling is called to specify Tooling API, e.g. client.Tooling().Query(q)
-func (client *Client) Tooling() *Client {
-	client.useToolingAPI = true
-	return client
-}
-
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
 func (client *Client) Query(q string) (*QueryResult, error) {
 	if !client.isLoggedIn() {
@@ -253,10 +247,12 @@ func (client *Client) SetHttpClient(c *http.Client) {
 }
 
 // DownloadFile downloads a file based on the REST API path given. Saves to filePath.
-func (client *Client) DownloadFile(APIPath string, filepath string) error {
+func (client *Client) DownloadFile(contentVersionID string, filepath string) error {
+
+	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/ContentVersion/%s/VersionData", client.apiVersion, contentVersionID)
 
 	baseURL := strings.TrimRight(client.baseURL, "/")
-	url := fmt.Sprintf("%s%s", baseURL, APIPath)
+	url := fmt.Sprintf("%s%s", baseURL, apiPath)
 
 	// Get the data
 	httpClient := client.httpClient
