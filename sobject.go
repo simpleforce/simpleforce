@@ -3,7 +3,6 @@ package simpleforce
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"log"
 	"net/http"
 	"strings"
@@ -105,10 +104,7 @@ func (obj *SObject) Create() *SObject {
 	}
 
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/")
-	fmt.Println("URL: " + url)
-	fmt.Println("REQDATA: " + string(reqData))
 	respData, err := obj.client().httpRequest(http.MethodPost, url, bytes.NewReader(reqData))
-	fmt.Println("RESPONSE: " + string(respData))
 	if err != nil {
 		log.Println(logPrefix, "failed to process http request,", err)
 		return nil
