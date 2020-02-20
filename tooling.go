@@ -33,7 +33,7 @@ func (client *Client) ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult
 	// Create the endpoint
 	formatString := "%s/services/data/v%s/tooling/executeAnonymous/?anonymousBody=%s"
 	baseURL := client.instanceURL
-	endpoint := fmt.Sprintf(formatString, baseURL, client.apiVersion, url.PathEscape(apexBody))
+	endpoint := fmt.Sprintf(formatString, baseURL, client.apiVersion, url.QueryEscape(apexBody))
 
 	data, err := client.httpRequest("GET", endpoint, nil)
 	if err != nil {
