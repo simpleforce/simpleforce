@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
+	"html"
 	"io"
 	"io/ioutil"
 	"log"
@@ -136,7 +137,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
                 </n1:login>
             </env:Body>
         </env:Envelope>`
-	soapBody = fmt.Sprintf(soapBody, client.clientID, username, password, token)
+	soapBody = fmt.Sprintf(soapBody, client.clientID, username, html.EscapeString(password), token)
 
 	url := fmt.Sprintf("%s/services/Soap/u/%s", client.baseURL, client.apiVersion)
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(soapBody))
