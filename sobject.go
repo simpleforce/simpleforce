@@ -14,6 +14,28 @@ const (
 	sobjectIDKey         = "Id"
 )
 
+var (
+	// When updating existing records, certain fields are read only and needs to be removed before submitted to Salesforce.
+	// Following list of fields are extracted from INVALID_FIELD_FOR_INSERT_UPDATE error message.
+	blacklistedUpdateFields = []string{
+		"LastModifiedDate",
+		"LastReferencedDate",
+		"IsClosed",
+		"ContactPhone",
+		"CreatedById",
+		"CaseNumber",
+		"ContactFax",
+		"ContactMobile",
+		"IsDeleted",
+		"LastViewedDate",
+		"SystemModstamp",
+		"CreatedDate",
+		"ContactEmail",
+		"ClosedDate",
+		"LastModifiedById",
+	}
+)
+
 // SObject describes an instance of SObject.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/resources_sobject_basic_info.htm
 type SObject map[string]interface{}
@@ -346,6 +368,9 @@ func (obj *SObject) makeCopy() map[string]interface{} {
 			continue
 		}
 		stripped[key] = val
+	}
+	for _, key := range blacklistedUpdateFields {
+		delete(stripped, key)
 	}
 	return stripped
 }
