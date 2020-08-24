@@ -217,3 +217,32 @@ func TestSObject_Delete(t *testing.T) {
 		t.Fail()
 	}
 }
+
+// TestSObject_GetUpdate validates updating of existing records.
+func TestSObject_GetUpdate(t *testing.T) {
+	client := requireClient(t, true)
+
+	// Create a new case first.
+	case1 := client.SObject("Case").
+		Set("Subject", "Original").
+		Create().
+		Get()
+
+	// Query the case by ID, then update the Subject.
+	case2 := client.SObject("Case").
+		Get(case1.ID()).
+		Set("Subject", "Updated").
+		Update().
+		Get()
+
+	// Query the case by ID again and check if the Subject has been updated.
+	case3 := client.SObject("Case").
+		Get(case2.ID())
+
+	if case3.StringField("Subject") != "Updated" {
+		t.Fail()
+	}
+
+	user1 := client.SObject("User").Create()
+	log.Println(user1.ID())
+}
