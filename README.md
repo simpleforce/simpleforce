@@ -46,7 +46,7 @@ var (
 	sfToken    = "Security token, could be omitted if Trusted IP is configured."
 )
 
-func creteClient() *simpleforce.Client {
+func createClient() *simpleforce.Client {
 	client := simpleforce.NewClient(sfURL, simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
 	if client == nil {
 		// handle the error
