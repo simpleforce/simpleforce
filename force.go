@@ -221,9 +221,8 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 
 // makeURL generates a REST API URL based on baseURL, APIVersion of the client.
 func (client *Client) makeURL(req string) string {
+	client.apiVersion = strings.Replace(client.apiVersion, "v", "", -1)
 	retURL := fmt.Sprintf("%s/services/data/v%s/%s", client.instanceURL, client.apiVersion, req)
-	// Fix potential problems
-	retURL = strings.Replace(retURL, "vv", "v", -1)
 	return retURL
 }
 
