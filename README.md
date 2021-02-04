@@ -150,6 +150,16 @@ func WorkWithRecords() {
 	userObj.Get()
 	fmt.Println(userObj.StringField("Name"))    // SUCCESS: returns the name of the user.
 	
+	// For Update(), start with a blank SObject.
+	// Set "Id" with an existing ID and any updated fields.
+	//
+	// Update() will return the updated object, or nil and print an error.
+	updateObj := client.SObject("Contact").								// Create an empty object of type "Contact".
+		Set("Id", "__ID__").											// Set the Id to an existing Contact ID.
+		Set("FirstName", "New Name").									// Set any updated fields.
+		Update()														// Update the record on Salesforce server.
+	fmt.Println(updateObj)
+
 	// Many SObject methods return the instance of the SObject, allowing chained access and operations to the
 	// object. In the following example, all methods, except "Delete", returns *SObject so that the next method
 	// can be invoked on the returned value directly.
@@ -159,8 +169,6 @@ func WorkWithRecords() {
     		Set("Subject", "Case created by simpleforce").              // Set the "Subject" field.
 	        Set("Comments", "Case commented by simpleforce").           // Set the "Comments" field.
     		Create().                                                   // Create the record on Salesforce server.
-    		Set("Subject", "Case subject updated by simpleforce").      // Modify the "Subject" field.
-    		Update().                                                   // Update the record on Salesforce server.
     		Get().                                                      // Refresh the fields from Salesforce server.
     		Delete()                                                    // Delete the record from Salesforce server.
 	fmt.Println(err)	
