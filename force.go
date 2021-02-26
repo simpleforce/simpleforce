@@ -163,6 +163,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 
 	if resp.StatusCode != http.StatusOK {
 		log.Println(logPrefix, "request failed,", resp.StatusCode)
+                log.Println(logPrefix, "failed resp.body: ", resp.Body)
 		return ErrFailure
 	}
 
