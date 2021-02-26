@@ -111,11 +111,6 @@ func (client *Client) isLoggedIn() bool {
 	return client.sessionID != ""
 }
 
-func (client *Client) LoginSidLoc(sid string, loc string) {
-	client.sessionID = sid
-	client.instanceURL = loc
-}
-
 // LoginPassword signs into salesforce using password. token is optional if trusted IP is configured.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_understanding_username_password_oauth_flow.htm
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api.meta/api/sforce_api_calls_login.htm
