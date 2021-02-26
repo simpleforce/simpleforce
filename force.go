@@ -112,8 +112,8 @@ func (client *Client) isLoggedIn() bool {
 }
 
 func (client *Client) LoginSidLoc(sid string, loc string) {
-        client.sessionID = sid
-        client.instanceURL = loc
+	client.sessionID = sid
+	client.instanceURL = loc
 }
 
 // LoginPassword signs into salesforce using password. token is optional if trusted IP is configured.
@@ -218,6 +218,7 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		log.Println(logPrefix, "status:", resp.StatusCode)
+		log.Println(ioutil.ReadAll(resp.Body))
 		return nil, ErrFailure
 	}
 
