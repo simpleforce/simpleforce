@@ -174,7 +174,10 @@ func (client *Client) LoginPassword(username, password, token string) error {
 
 	if resp.StatusCode != http.StatusOK {
 		log.Println(logPrefix, "request failed,", resp.StatusCode)
-                log.Println(logPrefix, "failed resp.body: ", resp.Body)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		newStr := buf.String()
+		log.Println(logPrefix, "Failed resp.body: ", newStr)
 		return ErrFailure
 	}
 
@@ -229,8 +232,11 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		log.Println(logPrefix, "status:", resp.StatusCode)
-		log.Println(string(ioutil.ReadAll(resp.Body)))
+		log.Println(logPrefix, "request failed,", resp.StatusCode)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		newStr := buf.String()
+		log.Println(logPrefix, "Failed resp.body: ", newStr)
 		return nil, ErrFailure
 	}
 
