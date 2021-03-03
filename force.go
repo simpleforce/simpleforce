@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
+	"bytes"
 
 	"github.com/pkg/errors"
 )
