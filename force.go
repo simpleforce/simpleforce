@@ -61,6 +61,11 @@ func (client *Client) GetSid() (sid string) {
         return client.sessionID
 }
 
+//Expose Loc to save in admin settings
+func (client *Client) GetLoc() (loc string) {
+	return client.instanceURL
+}
+
 // Set SID and Loc as a means to log in without LoginPassword
 func (client *Client) SetSidLoc(sid string, loc string) {
         client.sessionID = sid
