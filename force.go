@@ -58,15 +58,14 @@ type QueryResult struct {
 
 // Expose sid to save in admin settings
 func (client *Client) GetSid() (sid string) {
-	return Client.sessionId
+        return client.sessionID
 }
 
 // Set SID and Loc as a means to log in without LoginPassword
 func (client *Client) SetSidLoc(sid string, loc string) {
-	client.sessionId = sid
-	client.instanceURL = loc
+        client.sessionID = sid
+        client.instanceURL = loc
 }
-
 
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
 func (client *Client) Query(q string) (*QueryResult, error) {
