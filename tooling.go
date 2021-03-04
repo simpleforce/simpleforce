@@ -41,7 +41,7 @@ func (client *Client) ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult
 
 	data, err := client.httpRequest("GET", endpoint, nil)
 	if err != nil {
-		log.Println("HTTP GET request failed:", endpoint)
+		log.Println(logPrefix, "HTTP GET request failed:", endpoint)
 		return nil, err
 	}
 

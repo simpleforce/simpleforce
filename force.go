@@ -30,6 +30,7 @@ var (
 	ErrFailure = errors.New("general failure")
 	// ErrAuthentication is returned when authentication failed.
 	ErrAuthentication = errors.New("authentication failure")
+	ErrInvalidLogin = errors.New("")
 )
 
 // Client is the main instance to access salesforce.
@@ -95,7 +96,7 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 
 	data, err := client.httpRequest("GET", u, nil)
 	if err != nil {
-		log.Println("HTTP GET request failed:", u)
+		log.Println(logPrefix, "HTTP GET request failed:", u)
 		return nil, err
 	}
 
@@ -212,7 +213,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	client.user.email = loginResponse.UserEmail
 	client.user.fullName = loginResponse.UserFullName
 
-	log.Println("User", client.user.name, "authenticated.")
+	log.Println(logPrefix, "User", client.user.name, "authenticated.")
 	return nil
 }
 
