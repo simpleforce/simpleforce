@@ -13,8 +13,6 @@ import (
 	"os"
 	"strings"
 	"bytes"
-
-	"github.com/pkg/errors"
 )
 
 const (
@@ -23,14 +21,6 @@ const (
 	DefaultURL        = "https://login.salesforce.com"
 
 	logPrefix = "[simpleforce]"
-)
-
-var (
-	// ErrFailure is a generic error if none of the other errors are appropriate.
-	ErrFailure = errors.New("general failure")
-	// ErrAuthentication is returned when authentication failed.
-	ErrAuthentication = errors.New("authentication failure")
-	ErrInvalidLogin = errors.New("")
 )
 
 // Client is the main instance to access salesforce.
@@ -180,7 +170,8 @@ func (client *Client) LoginPassword(username, password, token string) error {
 		buf.ReadFrom(resp.Body)
 		newStr := buf.String()
 		log.Println(logPrefix, "Failed resp.body: ", newStr)
-		return ErrFailure
+		theError := ParseSalesforceError(resp.StatusCode, buf.Bytes())
+		return theError
 	}
 
 	respData, err := ioutil.ReadAll(resp.Body)
@@ -238,8 +229,9 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
 		newStr := buf.String()
+		theError := ParseSalesforceError(resp.StatusCode, buf.Bytes())
 		log.Println(logPrefix, "Failed resp.body: ", newStr)
-		return nil, ErrFailure
+		return nil, theError
 	}
 
 	return ioutil.ReadAll(resp.Body)
