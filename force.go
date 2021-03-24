@@ -65,7 +65,7 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	var u string
 	if strings.HasPrefix(q, "/services/data") {
 		// q is nextRecordsURL.
-		u = fmt.Sprintf("%s%s", client.baseURL, q)
+		u = fmt.Sprintf("%s%s", client.instanceURL, q)
 	} else {
 		// q is SOQL.
 		formatString := "%s/services/data/v%s/query?q=%s"
