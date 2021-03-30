@@ -83,7 +83,7 @@ func (obj *SObject) Get(id ...string) *SObject {
 	}
 
 	oid := obj.ID()
-	if id != nil {
+	if len(id) > 0 {
 		oid = id[0]
 	}
 	if oid == "" {
