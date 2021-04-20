@@ -290,13 +290,17 @@ func (client *Client) DescribeGlobal() *SObjectMeta {
 	// Get the objects
 	httpClient := client.httpClient
 	req, err := http.NewRequest("GET", url, nil)
-
+	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", "Bearer "+client.sessionID)
+	// resp, err := http.Get(url)
+	resp, err := httpClient.Do(req)
 	if err != nil {
-		return nil
+		return err
 	}
-
+	defer resp.Body.Close()
 	var meta SObjectMeta
-	err = json.Unmarshal(req, &meta)
+	err = json.Unmarshal(resp, &meta)
 	if err != nil {
 		return nil
 	}
