@@ -280,6 +280,7 @@ func (client *Client) DownloadFile(contentVersionID string, filepath string) err
 	return err
 }
 
+//Get the List of all available objects and their metadata for your organization’s data
 func (client *Client) DescribeGlobal() *SObjectMeta {
 	apiPath := fmt.Sprintf("/services/data/v%s/sobjects", client.apiVersion)
 
