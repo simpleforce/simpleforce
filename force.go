@@ -280,6 +280,28 @@ func (client *Client) DownloadFile(contentVersionID string, filepath string) err
 	return err
 }
 
+func (client *Client) DescribeGlobal() *SObjectMeta {
+	apiPath := fmt.Sprintf("/services/data/v%s/sobjects", client.apiVersion)
+
+	baseURL := strings.TrimRight(client.baseURL, "/")
+	url := fmt.Sprintf("%s%s", baseURL, apiPath)
+
+	// Get the objects
+	httpClient := client.httpClient
+	req, err := http.NewRequest("GET", url, nil)
+
+	if err != nil {
+		return nil
+	}
+
+	var meta SObjectMeta
+	err = json.Unmarshal(req, &meta)
+	if err != nil {
+		return nil
+	}
+	return &meta
+}
+
 func parseHost(input string) string {
 	parsed, err := url.Parse(input)
 	if err == nil {
