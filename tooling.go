@@ -24,6 +24,10 @@ func (client *Client) Tooling() *Client {
 	return client
 }
 
+func (client *Client) UnTooling() {
+	client.useToolingAPI = false
+}
+
 // ExecuteAnonymous executes a body of Apex code
 func (client *Client) ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult, error) {
 	if !client.isLoggedIn() {
@@ -37,7 +41,7 @@ func (client *Client) ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult
 
 	data, err := client.httpRequest("GET", endpoint, nil)
 	if err != nil {
-		log.Println("HTTP GET request failed:", endpoint)
+		log.Println(logPrefix, "HTTP GET request failed:", endpoint)
 		return nil, err
 	}
 

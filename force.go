@@ -12,8 +12,7 @@ import (
 	"net/url"
 	"os"
 	"strings"
-
-	"github.com/pkg/errors"
+	"bytes"
 )
 
 const (
@@ -22,13 +21,6 @@ const (
 	DefaultURL        = "https://login.salesforce.com"
 
 	logPrefix = "[simpleforce]"
-)
-
-var (
-	// ErrFailure is a generic error if none of the other errors are appropriate.
-	ErrFailure = errors.New("general failure")
-	// ErrAuthentication is returned when authentication failed.
-	ErrAuthentication = errors.New("authentication failure")
 )
 
 // Client is the main instance to access salesforce.
@@ -56,6 +48,22 @@ type QueryResult struct {
 	Records        []SObject `json:"records"`
 }
 
+// Expose sid to save in admin settings
+func (client *Client) GetSid() (sid string) {
+        return client.sessionID
+}
+
+//Expose Loc to save in admin settings
+func (client *Client) GetLoc() (loc string) {
+	return client.instanceURL
+}
+
+// Set SID and Loc as a means to log in without LoginPassword
+func (client *Client) SetSidLoc(sid string, loc string) {
+        client.sessionID = sid
+        client.instanceURL = loc
+}
+
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
 func (client *Client) Query(q string) (*QueryResult, error) {
 	if !client.isLoggedIn() {
@@ -78,7 +86,7 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 
 	data, err := client.httpRequest("GET", u, nil)
 	if err != nil {
-		log.Println("HTTP GET request failed:", u)
+		log.Println(logPrefix, "HTTP GET request failed:", u)
 		return nil, err
 	}
 
@@ -158,7 +166,12 @@ func (client *Client) LoginPassword(username, password, token string) error {
 
 	if resp.StatusCode != http.StatusOK {
 		log.Println(logPrefix, "request failed,", resp.StatusCode)
-		return ErrFailure
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		newStr := buf.String()
+		log.Println(logPrefix, "Failed resp.body: ", newStr)
+		theError := ParseSalesforceError(resp.StatusCode, buf.Bytes())
+		return theError
 	}
 
 	respData, err := ioutil.ReadAll(resp.Body)
@@ -191,7 +204,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	client.user.email = loginResponse.UserEmail
 	client.user.fullName = loginResponse.UserFullName
 
-	log.Println("User", client.user.name, "authenticated.")
+	log.Println(logPrefix, "User", client.user.name, "authenticated.")
 	return nil
 }
 
@@ -212,8 +225,13 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		log.Println(logPrefix, "status:", resp.StatusCode)
-		return nil, ErrFailure
+		log.Println(logPrefix, "request failed,", resp.StatusCode)
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		newStr := buf.String()
+		theError := ParseSalesforceError(resp.StatusCode, buf.Bytes())
+		log.Println(logPrefix, "Failed resp.body: ", newStr)
+		return nil, theError
 	}
 
 	return ioutil.ReadAll(resp.Body)
