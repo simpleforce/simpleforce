@@ -1,6 +1,7 @@
 package simpleforce
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"bytes"
 )
 
 const (
@@ -50,7 +50,7 @@ type QueryResult struct {
 
 // Expose sid to save in admin settings
 func (client *Client) GetSid() (sid string) {
-        return client.sessionID
+	return client.sessionID
 }
 
 //Expose Loc to save in admin settings
@@ -60,14 +60,14 @@ func (client *Client) GetLoc() (loc string) {
 
 // Set SID and Loc as a means to log in without LoginPassword
 func (client *Client) SetSidLoc(sid string, loc string) {
-        client.sessionID = sid
-        client.instanceURL = loc
+	client.sessionID = sid
+	client.instanceURL = loc
 }
 
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
 func (client *Client) Query(q string) (*QueryResult, error) {
 	if !client.isLoggedIn() {
-		return nil, ErrAuthentication
+		return nil, ERR_AUTHENTICATION
 	}
 
 	var u string
@@ -84,10 +84,10 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		u = fmt.Sprintf(formatString, baseURL, client.apiVersion, url.PathEscape(q))
 	}
 
-	data, err := client.httpRequest("GET", u, nil)
+	data, code, err := client.httpRequest("GET", u, nil)
 	if err != nil {
 		log.Println(logPrefix, "HTTP GET request failed:", u)
-		return nil, err
+		return nil, fmt.Errorf(`{"error" : %w, "code": %d}`, err, code)
 	}
 
 	var result QueryResult
@@ -209,10 +209,10 @@ func (client *Client) LoginPassword(username, password, token string) error {
 }
 
 // httpRequest executes an HTTP request to the salesforce server and returns the response data in byte buffer.
-func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, error) {
+func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, int, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusInternalServerError, err
 	}
 
 	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
@@ -220,7 +220,7 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 
 	resp, err := client.httpClient.Do(req)
 	if err != nil {
-		return nil, err
+		return nil, http.StatusBadRequest, err
 	}
 	defer resp.Body.Close()
 
@@ -228,13 +228,14 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 		log.Println(logPrefix, "request failed,", resp.StatusCode)
 		buf := new(bytes.Buffer)
 		buf.ReadFrom(resp.Body)
-		newStr := buf.String()
 		theError := ParseSalesforceError(resp.StatusCode, buf.Bytes())
-		log.Println(logPrefix, "Failed resp.body: ", newStr)
-		return nil, theError
+		return nil, resp.StatusCode, theError
 	}
-
-	return ioutil.ReadAll(resp.Body)
+	rBody, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, http.StatusInternalServerError, err
+	}
+	return rBody, resp.StatusCode, nil
 }
 
 // makeURL generates a REST API URL based on baseURL, APIVersion of the client.
@@ -326,9 +327,9 @@ func (client *Client) DescribeGlobal() (*SObjectMeta, error) {
 	var meta SObjectMeta
 
 	respData, err := ioutil.ReadAll(resp.Body)
-	log.Println(logPrefix, fmt.Sprintf("status code %d", resp.StatusCode))
 	if err != nil {
 		log.Println(logPrefix, "error while reading all body")
+		return nil, fmt.Errorf(`{"error" : %w, "code": %d}`, err, http.StatusInternalServerError)
 	}
 
 	err = json.Unmarshal(respData, &meta)

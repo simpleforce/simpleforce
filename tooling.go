@@ -31,7 +31,7 @@ func (client *Client) UnTooling() {
 // ExecuteAnonymous executes a body of Apex code
 func (client *Client) ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult, error) {
 	if !client.isLoggedIn() {
-		return nil, ErrAuthentication
+		return nil, ERR_FAILURE
 	}
 
 	// Create the endpoint
@@ -39,10 +39,10 @@ func (client *Client) ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult
 	baseURL := client.instanceURL
 	endpoint := fmt.Sprintf(formatString, baseURL, client.apiVersion, url.QueryEscape(apexBody))
 
-	data, err := client.httpRequest("GET", endpoint, nil)
+	data, code, err := client.httpRequest("GET", endpoint, nil)
 	if err != nil {
 		log.Println(logPrefix, "HTTP GET request failed:", endpoint)
-		return nil, err
+		return nil, fmt.Errorf(`{"error" : %w, "code": %d}`, err, code)
 	}
 
 	var result ExecuteAnonymousResult

@@ -3,14 +3,15 @@ package simpleforce
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"strings"
 )
 
 const (
-	sobjectClientKey     = "__client__" // private attribute added to locate client instance.
-	sobjectAttributesKey = "attributes" // points to the attributes structure which should be common to all SObjects.
+	SobjectClientKey     = "__client__" // private attribute added to locate client instance.
+	SobjectAttributesKey = "attributes" // points to the attributes structure which should be common to all SObjects.
 	sobjectIDKey         = "Id"
 )
 
@@ -52,23 +53,23 @@ type SObjectAttributes struct {
 
 // Describe queries the metadata of an SObject using the "describe" API.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/resources_sobject_describe.htm
-func (obj *SObject) Describe() *SObjectMeta {
+func (obj *SObject) Describe() (*SObjectMeta, error) {
 	if obj.Type() == "" || obj.client() == nil {
 		// Sanity check.
-		return nil
+		return nil, ERR_DATA_NOT_FOUND
 	}
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/describe")
-	data, err := obj.client().httpRequest(http.MethodGet, url, nil)
+	data, code, err := obj.client().httpRequest(http.MethodGet, url, nil)
 	if err != nil {
-		return nil
+		return nil, fmt.Errorf(`{"error" : %w, "code": %d}`, err, code)
 	}
 
 	var meta SObjectMeta
 	err = json.Unmarshal(data, &meta)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &meta
+	return &meta, nil
 }
 
 // Get retrieves all the data fields of an SObject. If id is provided, the SObject with the provided external ID will
@@ -76,10 +77,10 @@ func (obj *SObject) Describe() *SObjectMeta {
 // and id is not provided as the parameter, nil is returned.
 // If query is successful, the SObject is updated in-place and exact same address is returned; otherwise, nil is
 // returned if failed.
-func (obj *SObject) Get(id ...string) *SObject {
+func (obj *SObject) Get(id ...string) (*SObject, error) {
 	if obj.Type() == "" || obj.client() == nil {
 		// Sanity check.
-		return nil
+		return nil, ERR_DATA_NOT_FOUND
 	}
 
 	oid := obj.ID()
@@ -88,33 +89,33 @@ func (obj *SObject) Get(id ...string) *SObject {
 	}
 	if oid == "" {
 		log.Println(logPrefix, "object id not found.")
-		return nil
+		return nil, ERR_DATA_NOT_FOUND
 	}
 
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + oid)
-	data, err := obj.client().httpRequest(http.MethodGet, url, nil)
+	data, code, err := obj.client().httpRequest(http.MethodGet, url, nil)
 	if err != nil {
 		log.Println(logPrefix, "http request failed,", err)
-		return nil
+		return nil, fmt.Errorf(`{"error" : %w, "code": %d}`, err, code)
 	}
 
 	err = json.Unmarshal(data, obj)
 	if err != nil {
 		log.Println(logPrefix, "json decode failed,", err)
-		return nil
+		return nil, nil
 	}
 
-	return obj
+	return obj, nil
 }
 
 // Create posts the JSON representation of the SObject to salesforce to create the entry.
 // If the creation is successful, the ID of the SObject instance is updated with the ID returned. Otherwise, nil is
 // returned for failures.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_sobject_create.htm
-func (obj *SObject) Create() *SObject {
+func (obj *SObject) Create() (*SObject, error) {
 	if obj.Type() == "" || obj.client() == nil {
 		// Sanity check.
-		return nil
+		return nil, ERR_DATA_NOT_FOUND
 	}
 
 	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
@@ -122,14 +123,14 @@ func (obj *SObject) Create() *SObject {
 	reqData, err := json.Marshal(reqObj)
 	if err != nil {
 		log.Println(logPrefix, "failed to convert sobject to json,", err)
-		return nil
+		return nil, err
 	}
 
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/")
-	respData, err := obj.client().httpRequest(http.MethodPost, url, bytes.NewReader(reqData))
+	respData, code, err := obj.client().httpRequest(http.MethodPost, url, bytes.NewReader(reqData))
 	if err != nil {
 		log.Println(logPrefix, "failed to process http request,", err)
-		return nil
+		return nil, fmt.Errorf(`{"error" : %w, "code": %d}`, err, code)
 	}
 
 	// Use an anonymous struct to parse the result if any. This might need to be changed if the result should
@@ -141,24 +142,23 @@ func (obj *SObject) Create() *SObject {
 	err = json.Unmarshal(respData, &respVal)
 	if err != nil {
 		log.Println(logPrefix, "failed to process response data,", err)
-		return nil
+		return nil, err
 	}
 
 	if !respVal.Success || respVal.ID == "" {
-		log.Println(logPrefix, "unsuccessful")
-		return nil
+		return nil, err
 	}
 
 	obj.setID(respVal.ID)
-	return obj
+	return obj, err
 }
 
 // Update updates SObject in place. Upon successful, same SObject is returned for chained access.
 // ID is required.
-func (obj *SObject) Update() *SObject {
+func (obj *SObject) Update() (*SObject, error) {
 	if obj.Type() == "" || obj.client() == nil || obj.ID() == "" {
 		// Sanity check.
-		return nil
+		return nil, ERR_DATA_NOT_FOUND
 	}
 
 	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
@@ -166,7 +166,7 @@ func (obj *SObject) Update() *SObject {
 	reqData, err := json.Marshal(reqObj)
 	if err != nil {
 		log.Println(logPrefix, "failed to convert sobject to json,", err)
-		return nil
+		return nil, err
 	}
 
 	queryBase := "sobjects/"
@@ -174,14 +174,13 @@ func (obj *SObject) Update() *SObject {
 		queryBase = "tooling/sobjects/"
 	}
 	url := obj.client().makeURL(queryBase + obj.Type() + "/" + obj.ID())
-	respData, err := obj.client().httpRequest(http.MethodPatch, url, bytes.NewReader(reqData))
+	_, code, err := obj.client().httpRequest(http.MethodPatch, url, bytes.NewReader(reqData))
 	if err != nil {
 		log.Println(logPrefix, "failed to process http request,", err)
-		return nil
+		return nil, fmt.Errorf(`{"error" : %w, "code": %d}`, err, code)
 	}
-	log.Println(string(respData))
 
-	return obj
+	return obj, err
 }
 
 // Delete deletes an SObject record identified by external ID. nil is returned if the operation completes successfully;
@@ -189,7 +188,7 @@ func (obj *SObject) Update() *SObject {
 func (obj *SObject) Delete(id ...string) error {
 	if obj.Type() == "" || obj.client() == nil {
 		// Sanity check
-		return ErrFailure
+		return ERR_FAILURE
 	}
 
 	oid := obj.ID()
@@ -197,14 +196,13 @@ func (obj *SObject) Delete(id ...string) error {
 		oid = id[0]
 	}
 	if oid == "" {
-		return ErrFailure
+		return ERR_FAILURE
 	}
 
 	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + obj.ID())
-	log.Println(url)
-	_, err := obj.client().httpRequest(http.MethodDelete, url, nil)
+	_, code, err := obj.client().httpRequest(http.MethodDelete, url, nil)
 	if err != nil {
-		return err
+		return fmt.Errorf(`{"error" : %w, "code": %d}`, err, code)
 	}
 
 	return nil
@@ -254,7 +252,7 @@ func (obj *SObject) SObjectField(typeName, key string) *SObject {
 	if !ok {
 		return nil
 	}
-	attrs, ok := linkedObjMapper[sobjectAttributesKey].(map[string]interface{})
+	attrs, ok := linkedObjMapper[SobjectAttributesKey].(map[string]interface{})
 	if !ok {
 		return nil
 	}
@@ -292,7 +290,7 @@ func (obj *SObject) InterfaceField(key string) interface{} {
 
 // AttributesField returns a read-only copy of the attributes field of an SObject.
 func (obj *SObject) AttributesField() *SObjectAttributes {
-	attributes := obj.InterfaceField(sobjectAttributesKey)
+	attributes := obj.InterfaceField(SobjectAttributesKey)
 
 	switch attributes.(type) {
 	case SObjectAttributes:
@@ -324,7 +322,7 @@ func (obj *SObject) Set(key string, value interface{}) *SObject {
 
 // client returns the associated Client with the SObject.
 func (obj *SObject) client() *Client {
-	client := obj.InterfaceField(sobjectClientKey)
+	client := obj.InterfaceField(SobjectClientKey)
 	switch client.(type) {
 	case *Client:
 		return client.(*Client)
@@ -335,19 +333,19 @@ func (obj *SObject) client() *Client {
 
 // setClient sets the associated Client with the SObject.
 func (obj *SObject) setClient(client *Client) {
-	(*obj)[sobjectClientKey] = client
+	(*obj)[SobjectClientKey] = client
 }
 
 // setType sets the type, or name for the SObject.
 func (obj *SObject) setType(typeName string) {
-	attributes := obj.InterfaceField(sobjectAttributesKey)
+	attributes := obj.InterfaceField(SobjectAttributesKey)
 	switch attributes.(type) {
 	case SObjectAttributes:
 		attrs := obj.AttributesField()
 		attrs.Type = typeName
-		(*obj)[sobjectAttributesKey] = *attrs
+		(*obj)[SobjectAttributesKey] = *attrs
 	default:
-		(*obj)[sobjectAttributesKey] = SObjectAttributes{
+		(*obj)[SobjectAttributesKey] = SObjectAttributes{
 			Type: typeName,
 		}
 	}
@@ -362,8 +360,8 @@ func (obj *SObject) setID(id string) {
 func (obj *SObject) makeCopy() map[string]interface{} {
 	stripped := make(map[string]interface{})
 	for key, val := range *obj {
-		if key == sobjectClientKey ||
-			key == sobjectAttributesKey ||
+		if key == SobjectClientKey ||
+			key == SobjectAttributesKey ||
 			key == sobjectIDKey {
 			continue
 		}
