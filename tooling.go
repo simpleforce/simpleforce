@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net/http"
 	"net/url"
 )
 
@@ -19,27 +20,27 @@ type ExecuteAnonymousResult struct {
 }
 
 // Tooling is called to specify Tooling API, e.g. client.Tooling().Query(q)
-func (client *Client) Tooling() *Client {
-	client.useToolingAPI = true
-	return client
+func (h *HTTPClient) Tooling() *HTTPClient {
+	h.useToolingAPI = true
+	return h
 }
 
-func (client *Client) UnTooling() {
-	client.useToolingAPI = false
+func (h *HTTPClient) UnTooling() {
+	h.useToolingAPI = false
 }
 
 // ExecuteAnonymous executes a body of Apex code
-func (client *Client) ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult, error) {
-	if !client.isLoggedIn() {
+func (h *HTTPClient) ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult, error) {
+	if !h.isLoggedIn() {
 		return nil, ErrAuthentication
 	}
 
 	// Create the endpoint
 	formatString := "%s/services/data/v%s/tooling/executeAnonymous/?anonymousBody=%s"
-	baseURL := client.instanceURL
-	endpoint := fmt.Sprintf(formatString, baseURL, client.apiVersion, url.QueryEscape(apexBody))
+	baseURL := h.instanceURL
+	endpoint := fmt.Sprintf(formatString, baseURL, h.apiVersion, url.QueryEscape(apexBody))
 
-	data, err := client.httpRequest("GET", endpoint, nil)
+	data, err := h.httpRequest(http.MethodGet, endpoint, nil)
 	if err != nil {
 		log.Println(logPrefix, "HTTP GET request failed:", endpoint)
 		return nil, err

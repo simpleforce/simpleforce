@@ -1,6 +1,7 @@
 package simpleforce
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"bytes"
 )
 
 const (
@@ -23,8 +23,24 @@ const (
 	logPrefix = "[simpleforce]"
 )
 
-// Client is the main instance to access salesforce.
-type Client struct {
+type Client interface {
+	DescribeGlobal() (*SObjectMeta, error)
+	DownloadFile(contentVersionID string, filepath string) error
+	ExecuteAnonymous(apexBody string) (*ExecuteAnonymousResult, error)
+	GetLoc() (loc string)
+	GetSid() (sid string)
+	Login(username, password, token string) error
+	Query(q string) (*QueryResult, error)
+	SetSidLoc(sid string, loc string)
+	SObject(typeName ...string) *SObject
+	Tooling() *HTTPClient
+	UnTooling()
+}
+
+var _ Client = (*HTTPClient)(nil)
+
+// HTTPClient is the main instance to access salesforce.
+type HTTPClient struct {
 	sessionID string
 	user      struct {
 		id       string
@@ -40,6 +56,22 @@ type Client struct {
 	httpClient    *http.Client
 }
 
+// NewHTTPClient creates a new instance of the client.
+func NewHTTPClient(httpClient *http.Client, url, clientID, apiVersion string) *HTTPClient {
+	client := &HTTPClient{
+		apiVersion: apiVersion,
+		baseURL:    url,
+		clientID:   clientID,
+		httpClient: httpClient,
+	}
+
+	// Append "/" to the end of baseURL if not yet.
+	if !strings.HasSuffix(client.baseURL, "/") {
+		client.baseURL = client.baseURL + "/"
+	}
+	return client
+}
+
 // QueryResult holds the response data from an SOQL query.
 type QueryResult struct {
 	TotalSize      int       `json:"totalSize"`
@@ -49,42 +81,42 @@ type QueryResult struct {
 }
 
 // Expose sid to save in admin settings
-func (client *Client) GetSid() (sid string) {
-        return client.sessionID
+func (h *HTTPClient) GetSid() (sid string) {
+	return h.sessionID
 }
 
 //Expose Loc to save in admin settings
-func (client *Client) GetLoc() (loc string) {
-	return client.instanceURL
+func (h *HTTPClient) GetLoc() (loc string) {
+	return h.instanceURL
 }
 
-// Set SID and Loc as a means to log in without LoginPassword
-func (client *Client) SetSidLoc(sid string, loc string) {
-        client.sessionID = sid
-        client.instanceURL = loc
+// Set SID and Loc as a means to log in without Login()
+func (h *HTTPClient) SetSidLoc(sid string, loc string) {
+	h.sessionID = sid
+	h.instanceURL = loc
 }
 
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
-func (client *Client) Query(q string) (*QueryResult, error) {
-	if !client.isLoggedIn() {
+func (h *HTTPClient) Query(q string) (*QueryResult, error) {
+	if !h.isLoggedIn() {
 		return nil, ErrAuthentication
 	}
 
 	var u string
 	if strings.HasPrefix(q, "/services/data") {
 		// q is nextRecordsURL.
-		u = fmt.Sprintf("%s%s", client.instanceURL, q)
+		u = fmt.Sprintf("%s%s", h.instanceURL, q)
 	} else {
 		// q is SOQL.
 		formatString := "%s/services/data/v%s/query?q=%s"
-		baseURL := client.instanceURL
-		if client.useToolingAPI {
+		baseURL := h.instanceURL
+		if h.useToolingAPI {
 			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
 		}
-		u = fmt.Sprintf(formatString, baseURL, client.apiVersion, url.PathEscape(q))
+		u = fmt.Sprintf(formatString, baseURL, h.apiVersion, url.PathEscape(q))
 	}
 
-	data, err := client.httpRequest("GET", u, nil)
+	data, err := h.httpRequest(http.MethodGet, u, nil)
 	if err != nil {
 		log.Println(logPrefix, "HTTP GET request failed:", u)
 		return nil, err
@@ -98,16 +130,16 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 
 	// Reference to client is needed if the object will be further used to do online queries.
 	for idx := range result.Records {
-		result.Records[idx].setClient(client)
+		result.Records[idx].setClient(h)
 	}
 
 	return &result, nil
 }
 
 // SObject creates an SObject instance with provided type name and associate the SObject with the client.
-func (client *Client) SObject(typeName ...string) *SObject {
+func (h *HTTPClient) SObject(typeName ...string) *SObject {
 	obj := &SObject{}
-	obj.setClient(client)
+	obj.setClient(h)
 	if typeName != nil {
 		obj.setType(typeName[0])
 	}
@@ -115,14 +147,14 @@ func (client *Client) SObject(typeName ...string) *SObject {
 }
 
 // isLoggedIn returns if the login to salesforce is successful.
-func (client *Client) isLoggedIn() bool {
+func (client *HTTPClient) isLoggedIn() bool {
 	return client.sessionID != ""
 }
 
-// LoginPassword signs into salesforce using password. token is optional if trusted IP is configured.
+// Login signs into salesforce using password. token is optional if trusted IP is configured.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_understanding_username_password_oauth_flow.htm
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api.meta/api/sforce_api_calls_login.htm
-func (client *Client) LoginPassword(username, password, token string) error {
+func (h *HTTPClient) Login(username, password, token string) error {
 	// Use the SOAP interface to acquire session ID with username, password, and token.
 	// Do not use REST interface here as REST interface seems to have strong checking against client_id, while the SOAP
 	// interface allows a non-exist placeholder client_id to be used.
@@ -145,19 +177,21 @@ func (client *Client) LoginPassword(username, password, token string) error {
                 </n1:login>
             </env:Body>
         </env:Envelope>`
-	soapBody = fmt.Sprintf(soapBody, client.clientID, username, html.EscapeString(password), token)
+	soapBody = fmt.Sprintf(soapBody, h.clientID, username, html.EscapeString(password), token)
 
-	url := fmt.Sprintf("%s/services/Soap/u/%s", client.baseURL, client.apiVersion)
+	url := fmt.Sprintf("%s/services/Soap/u/%s", h.baseURL, h.apiVersion)
+
 	req, err := http.NewRequest(http.MethodPost, url, strings.NewReader(soapBody))
 	if err != nil {
 		log.Println(logPrefix, "error occurred creating request,", err)
 		return err
 	}
+
 	req.Header.Add("Content-Type", "text/xml")
 	req.Header.Add("charset", "UTF-8")
 	req.Header.Add("SOAPAction", "login")
 
-	resp, err := client.httpClient.Do(req)
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		log.Println(logPrefix, "error occurred submitting request,", err)
 		return err
@@ -171,6 +205,7 @@ func (client *Client) LoginPassword(username, password, token string) error {
 		newStr := buf.String()
 		log.Println(logPrefix, "Failed resp.body: ", newStr)
 		theError := ParseSalesforceError(resp.StatusCode, buf.Bytes())
+
 		return theError
 	}
 
@@ -197,28 +232,28 @@ func (client *Client) LoginPassword(username, password, token string) error {
 	}
 
 	// Now we should all be good and the sessionID can be used to talk to salesforce further.
-	client.sessionID = loginResponse.SessionID
-	client.instanceURL = parseHost(loginResponse.ServerURL)
-	client.user.id = loginResponse.UserID
-	client.user.name = loginResponse.UserName
-	client.user.email = loginResponse.UserEmail
-	client.user.fullName = loginResponse.UserFullName
+	h.sessionID = loginResponse.SessionID
+	h.instanceURL = parseHost(loginResponse.ServerURL)
+	h.user.id = loginResponse.UserID
+	h.user.name = loginResponse.UserName
+	h.user.email = loginResponse.UserEmail
+	h.user.fullName = loginResponse.UserFullName
 
-	log.Println(logPrefix, "User", client.user.name, "authenticated.")
+	log.Println(logPrefix, "User", h.user.name, "authenticated.")
 	return nil
 }
 
 // httpRequest executes an HTTP request to the salesforce server and returns the response data in byte buffer.
-func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, error) {
+func (h *HTTPClient) httpRequest(method, url string, body io.Reader) ([]byte, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
 	}
 
-	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", client.sessionID))
+	req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", h.sessionID))
 	req.Header.Add("Content-Type", "application/json")
 
-	resp, err := client.httpClient.Do(req)
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +266,7 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 		newStr := buf.String()
 		theError := ParseSalesforceError(resp.StatusCode, buf.Bytes())
 		log.Println(logPrefix, "Failed resp.body: ", newStr)
+
 		return nil, theError
 	}
 
@@ -238,49 +274,29 @@ func (client *Client) httpRequest(method, url string, body io.Reader) ([]byte, e
 }
 
 // makeURL generates a REST API URL based on baseURL, APIVersion of the client.
-func (client *Client) makeURL(req string) string {
-	client.apiVersion = strings.Replace(client.apiVersion, "v", "", -1)
-	retURL := fmt.Sprintf("%s/services/data/v%s/%s", client.instanceURL, client.apiVersion, req)
+func (h *HTTPClient) makeURL(req string) string {
+	h.apiVersion = strings.Replace(h.apiVersion, "v", "", -1)
+	retURL := fmt.Sprintf("%s/services/data/v%s/%s", h.instanceURL, h.apiVersion, req)
 	return retURL
 }
 
-// NewClient creates a new instance of the client.
-func NewClient(url, clientID, apiVersion string) *Client {
-	client := &Client{
-		apiVersion: apiVersion,
-		baseURL:    url,
-		clientID:   clientID,
-		httpClient: &http.Client{},
-	}
-
-	// Append "/" to the end of baseURL if not yet.
-	if !strings.HasSuffix(client.baseURL, "/") {
-		client.baseURL = client.baseURL + "/"
-	}
-	return client
-}
-
-func (client *Client) SetHttpClient(c *http.Client) {
-	client.httpClient = c
-}
-
 // DownloadFile downloads a file based on the REST API path given. Saves to filePath.
-func (client *Client) DownloadFile(contentVersionID string, filepath string) error {
-
-	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/ContentVersion/%s/VersionData", client.apiVersion, contentVersionID)
-
-	baseURL := strings.TrimRight(client.baseURL, "/")
+func (h *HTTPClient) DownloadFile(contentVersionID string, filepath string) error {
+	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/ContentVersion/%s/VersionData", h.apiVersion, contentVersionID)
+	baseURL := strings.TrimRight(h.baseURL, "/")
 	url := fmt.Sprintf("%s%s", baseURL, apiPath)
 
 	// Get the data
-	httpClient := client.httpClient
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return err
+	}
 	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", "Bearer "+client.sessionID)
+	req.Header.Add("Authorization", "Bearer "+h.sessionID)
 
 	// resp, err := http.Get(url)
-	resp, err := httpClient.Do(req)
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return err
 	}
@@ -307,17 +323,21 @@ func parseHost(input string) string {
 }
 
 //Get the List of all available objects and their metadata for your organization's data
-func (client *Client) DescribeGlobal() (*SObjectMeta, error) {
-	apiPath := fmt.Sprintf("/services/data/v%s/sobjects", client.apiVersion)
-	baseURL := strings.TrimRight(client.baseURL, "/")
+func (h *HTTPClient) DescribeGlobal() (*SObjectMeta, error) {
+	apiPath := fmt.Sprintf("/services/data/v%s/sobjects", h.apiVersion)
+	baseURL := strings.TrimRight(h.baseURL, "/")
 	url := fmt.Sprintf("%s%s", baseURL, apiPath) // Get the objects
-	httpClient := client.httpClient
-	req, err := http.NewRequest("GET", url, nil)
+
+	req, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+
 	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
 	req.Header.Add("Accept", "application/json")
-	req.Header.Add("Authorization", "Bearer "+client.sessionID)
-	// resp, err := http.Get(url)
-	resp, err := httpClient.Do(req)
+	req.Header.Add("Authorization", "Bearer "+h.sessionID)
+
+	resp, err := h.httpClient.Do(req)
 	if err != nil {
 		return nil, err
 	}

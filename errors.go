@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"github.com/pkg/errors"
 	"log"
+
+	"github.com/pkg/errors"
 )
 
 var (
@@ -22,7 +23,7 @@ type jsonError []struct {
 }
 
 type xmlError struct {
-	Message string `xml:"Body>Fault>faultstring"`
+	Message   string `xml:"Body>Fault>faultstring"`
 	ErrorCode string `xml:"Body>Fault>faultcode"`
 }
 

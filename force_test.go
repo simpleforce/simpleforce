@@ -2,6 +2,7 @@ package simpleforce
 
 import (
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"testing"
@@ -27,16 +28,16 @@ func checkCredentialsAndSkip(t *testing.T) {
 	}
 }
 
-func requireClient(t *testing.T, skippable bool) *Client {
+func requireClient(t *testing.T, skippable bool) *HTTPClient {
 	if skippable {
 		checkCredentialsAndSkip(t)
 	}
 
-	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
+	client := NewHTTPClient(http.DefaultClient, sfURL, DefaultClientID, DefaultAPIVersion)
 	if client == nil {
 		t.Fail()
 	}
-	err := client.LoginPassword(sfUser, sfPass, sfToken)
+	err := client.Login(sfUser, sfPass, sfToken)
 	if err != nil {
 		t.Fatal()
 	}
@@ -46,20 +47,20 @@ func requireClient(t *testing.T, skippable bool) *Client {
 func TestClient_LoginPassword(t *testing.T) {
 	checkCredentialsAndSkip(t)
 
-	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
+	client := NewHTTPClient(http.DefaultClient, sfURL, DefaultClientID, DefaultAPIVersion)
 	if client == nil {
 		t.Fatal()
 	}
 
 	// Use token
-	err := client.LoginPassword(sfUser, sfPass, sfToken)
+	err := client.Login(sfUser, sfPass, sfToken)
 	if err != nil {
 		t.Fail()
 	} else {
 		log.Println(logPrefix, "sessionID:", client.sessionID)
 	}
 
-	err = client.LoginPassword("__INVALID_USER__", "__INVALID_PASS__", "__INVALID_TOKEN__")
+	err = client.Login("__INVALID_USER__", "__INVALID_PASS__", "__INVALID_TOKEN__")
 	if err == nil {
 		t.Fail()
 	}
@@ -68,22 +69,18 @@ func TestClient_LoginPassword(t *testing.T) {
 func TestClient_LoginPasswordNoToken(t *testing.T) {
 	checkCredentialsAndSkip(t)
 
-	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
+	client := NewHTTPClient(http.DefaultClient, sfURL, DefaultClientID, DefaultAPIVersion)
 	if client == nil {
 		t.Fatal()
 	}
 
 	// Trusted IP must be configured AND the request must be initiated from the trusted IP range.
-	err := client.LoginPassword(sfUser, sfPass, "")
+	err := client.Login(sfUser, sfPass, "")
 	if err != nil {
 		t.FailNow()
 	} else {
 		log.Println(logPrefix, "sessionID:", client.sessionID)
 	}
-}
-
-func TestClient_LoginOAuth(t *testing.T) {
-
 }
 
 func TestClient_Query(t *testing.T) {

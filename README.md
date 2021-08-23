@@ -2,7 +2,7 @@
 
 A simple Golang client for Salesforce
 
-[![GoDoc](https://godoc.org/github.com/simpleforce/simpleforce?status.svg)](https://godoc.org/github.com/simpleforce/simpleforce)
+[![GoDoc](https://godoc.org/github.com/eleanorhealth/simpleforce?status.svg)](https://godoc.org/github.com/eleanorhealth/simpleforce)
 
 ## Features
 
@@ -24,7 +24,7 @@ Most of the implementation referenced Salesforce documentation here: https://dev
 `simpleforce` can be acquired as any other Go libraries via `go get`:
 
 ```
-go get github.com/simpleforce/simpleforce
+go get github.com/eleanorhealth/simpleforce
 ```
 
 ## Quick Start
@@ -37,7 +37,7 @@ A `client` instance is the main entrance to access Salesforce using simpleforce.
 ```go
 package main
 
-import "github.com/simpleforce/simpleforce"
+import "github.com/eleanorhealth/simpleforce"
 
 var (
 	sfURL      = "Custom or instance URL, for example, 'https://na01.salesforce.com/'"
@@ -47,14 +47,14 @@ var (
 )
 
 func createClient() *simpleforce.Client {
-	client := simpleforce.NewClient(sfURL, simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
+	client := simpleforce.NewHTTPClient(sfURL, simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
 	if client == nil {
 		// handle the error
 
 		return nil
 	}
     
-	err := client.LoginPassword(sfUser, sfPassword, sfToken)
+	err := client.Login(sfUser, sfPassword, sfToken)
 	if err != nil {
 		// handle the error
 
@@ -78,12 +78,12 @@ package main
 
 import (
     "fmt"
-    "github.com/simpleforce/simpleforce"
+    "github.com/eleanorhealth/simpleforce"
 )
 
 func Query() {
-	client := simpleforce.NewClient(...)
-	client.LoginPassword(...)
+	client := simpleforce.NewHTTPClient(...)
+	client.Login(...)
 
 	q := "Some SOQL Query String"
 	result, err := client.Query(q) // Note: for Tooling API, use client.Tooling().Query(q)
@@ -112,12 +112,12 @@ package main
 
 import (
     "fmt"
-    "github.com/simpleforce/simpleforce"
+    "github.com/eleanorhealth/simpleforce"
 )
 
 func WorkWithRecords() {
-	client := simpleforce.NewClient(...)
-	client.LoginPassword(...)
+	client := simpleforce.NewHTTPClient(...)
+	client.Login(...)
 	
 	// Get an SObject with given type and external ID
 	obj := client.SObject("Case").Get("__ID__")
@@ -218,11 +218,3 @@ if err != nil {
 A set of unit test cases are provided to validate the basic functions of simpleforce. Please do not run these 
 unit tests with a production instance of Salesforce as it would create, modify and delete data from the provided
 Salesforce account.
-
-## License and Acknowledgement
-
-This package is released under BSD license. Part of the code referenced the simple-salesforce
-(https://github.com/simple-salesforce/simple-salesforce) project and the credit goes to Nick Catalano and the community
-maintaining simple-salesforce.
-
-Contributions are welcome, cheers :-)

@@ -52,13 +52,13 @@ type SObjectAttributes struct {
 
 // Describe queries the metadata of an SObject using the "describe" API.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/resources_sobject_describe.htm
-func (obj *SObject) Describe() *SObjectMeta {
-	if obj.Type() == "" || obj.client() == nil {
+func (s *SObject) Describe() *SObjectMeta {
+	if s.Type() == "" || s.client() == nil {
 		// Sanity check.
 		return nil
 	}
-	url := obj.client().makeURL("sobjects/" + obj.Type() + "/describe")
-	data, err := obj.client().httpRequest(http.MethodGet, url, nil)
+	url := s.client().makeURL("sobjects/" + s.Type() + "/describe")
+	data, err := s.client().httpRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil
 	}
@@ -76,13 +76,13 @@ func (obj *SObject) Describe() *SObjectMeta {
 // and id is not provided as the parameter, nil is returned.
 // If query is successful, the SObject is updated in-place and exact same address is returned; otherwise, nil is
 // returned if failed.
-func (obj *SObject) Get(id ...string) *SObject {
-	if obj.Type() == "" || obj.client() == nil {
+func (s *SObject) Get(id ...string) *SObject {
+	if s.Type() == "" || s.client() == nil {
 		// Sanity check.
 		return nil
 	}
 
-	oid := obj.ID()
+	oid := s.ID()
 	if len(id) > 0 {
 		oid = id[0]
 	}
@@ -91,42 +91,42 @@ func (obj *SObject) Get(id ...string) *SObject {
 		return nil
 	}
 
-	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + oid)
-	data, err := obj.client().httpRequest(http.MethodGet, url, nil)
+	url := s.client().makeURL("sobjects/" + s.Type() + "/" + oid)
+	data, err := s.client().httpRequest(http.MethodGet, url, nil)
 	if err != nil {
 		log.Println(logPrefix, "http request failed,", err)
 		return nil
 	}
 
-	err = json.Unmarshal(data, obj)
+	err = json.Unmarshal(data, s)
 	if err != nil {
 		log.Println(logPrefix, "json decode failed,", err)
 		return nil
 	}
 
-	return obj
+	return s
 }
 
 // Create posts the JSON representation of the SObject to salesforce to create the entry.
 // If the creation is successful, the ID of the SObject instance is updated with the ID returned. Otherwise, nil is
 // returned for failures.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_sobject_create.htm
-func (obj *SObject) Create() *SObject {
-	if obj.Type() == "" || obj.client() == nil {
+func (s *SObject) Create() *SObject {
+	if s.Type() == "" || s.client() == nil {
 		// Sanity check.
 		return nil
 	}
 
 	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
-	reqObj := obj.makeCopy()
+	reqObj := s.makeCopy()
 	reqData, err := json.Marshal(reqObj)
 	if err != nil {
 		log.Println(logPrefix, "failed to convert sobject to json,", err)
 		return nil
 	}
 
-	url := obj.client().makeURL("sobjects/" + obj.Type() + "/")
-	respData, err := obj.client().httpRequest(http.MethodPost, url, bytes.NewReader(reqData))
+	url := s.client().makeURL("sobjects/" + s.Type() + "/")
+	respData, err := s.client().httpRequest(http.MethodPost, url, bytes.NewReader(reqData))
 	if err != nil {
 		log.Println(logPrefix, "failed to process http request,", err)
 		return nil
@@ -149,20 +149,20 @@ func (obj *SObject) Create() *SObject {
 		return nil
 	}
 
-	obj.setID(respVal.ID)
-	return obj
+	s.setID(respVal.ID)
+	return s
 }
 
 // Update updates SObject in place. Upon successful, same SObject is returned for chained access.
 // ID is required.
-func (obj *SObject) Update() *SObject {
-	if obj.Type() == "" || obj.client() == nil || obj.ID() == "" {
+func (s *SObject) Update() *SObject {
+	if s.Type() == "" || s.client() == nil || s.ID() == "" {
 		// Sanity check.
 		return nil
 	}
 
 	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
-	reqObj := obj.makeCopy()
+	reqObj := s.makeCopy()
 	reqData, err := json.Marshal(reqObj)
 	if err != nil {
 		log.Println(logPrefix, "failed to convert sobject to json,", err)
@@ -170,29 +170,29 @@ func (obj *SObject) Update() *SObject {
 	}
 
 	queryBase := "sobjects/"
-	if obj.client().useToolingAPI {
+	if s.client().useToolingAPI {
 		queryBase = "tooling/sobjects/"
 	}
-	url := obj.client().makeURL(queryBase + obj.Type() + "/" + obj.ID())
-	respData, err := obj.client().httpRequest(http.MethodPatch, url, bytes.NewReader(reqData))
+	url := s.client().makeURL(queryBase + s.Type() + "/" + s.ID())
+	respData, err := s.client().httpRequest(http.MethodPatch, url, bytes.NewReader(reqData))
 	if err != nil {
 		log.Println(logPrefix, "failed to process http request,", err)
 		return nil
 	}
 	log.Println(string(respData))
 
-	return obj
+	return s
 }
 
 // Delete deletes an SObject record identified by external ID. nil is returned if the operation completes successfully;
 // otherwise an error is returned
-func (obj *SObject) Delete(id ...string) error {
-	if obj.Type() == "" || obj.client() == nil {
+func (s *SObject) Delete(id ...string) error {
+	if s.Type() == "" || s.client() == nil {
 		// Sanity check
 		return ErrFailure
 	}
 
-	oid := obj.ID()
+	oid := s.ID()
 	if id != nil {
 		oid = id[0]
 	}
@@ -200,9 +200,9 @@ func (obj *SObject) Delete(id ...string) error {
 		return ErrFailure
 	}
 
-	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + obj.ID())
+	url := s.client().makeURL("sobjects/" + s.Type() + "/" + s.ID())
 	log.Println(url)
-	_, err := obj.client().httpRequest(http.MethodDelete, url, nil)
+	_, err := s.client().httpRequest(http.MethodDelete, url, nil)
 	if err != nil {
 		return err
 	}
@@ -211,8 +211,8 @@ func (obj *SObject) Delete(id ...string) error {
 }
 
 // Type returns the type, or sometimes referred to as name, of an SObject.
-func (obj *SObject) Type() string {
-	attributes := obj.AttributesField()
+func (s *SObject) Type() string {
+	attributes := s.AttributesField()
 	if attributes == nil {
 		return ""
 	}
@@ -225,8 +225,8 @@ func (obj *SObject) ID() string {
 }
 
 // StringField accesses a field in the SObject as string. Empty string is returned if the field doesn't exist.
-func (obj *SObject) StringField(key string) string {
-	value := obj.InterfaceField(key)
+func (s *SObject) StringField(key string) string {
+	value := s.InterfaceField(key)
 	switch value.(type) {
 	case string:
 		return value.(string)
@@ -237,19 +237,19 @@ func (obj *SObject) StringField(key string) string {
 
 // SObjectField accesses a field in the SObject as another SObject. This is only applicable if the field is an external
 // ID to another object. The typeName of the SObject must be provided. <nil> is returned if the field is empty.
-func (obj *SObject) SObjectField(typeName, key string) *SObject {
+func (s *SObject) SObjectField(typeName, key string) *SObject {
 	// First check if there's an associated ID directly.
-	oid := obj.StringField(key)
+	oid := s.StringField(key)
 	if oid != "" {
 		object := &SObject{}
-		object.setClient(obj.client())
+		object.setClient(s.client())
 		object.setType(typeName)
 		object.setID(oid)
 		return object
 	}
 
 	// Secondly, check if this could be a linked object, which doesn't have an ID but has the attributes.
-	linkedObjRaw := obj.InterfaceField(key)
+	linkedObjRaw := s.InterfaceField(key)
 	linkedObjMapper, ok := linkedObjRaw.(map[string]interface{})
 	if !ok {
 		return nil
@@ -276,7 +276,7 @@ func (obj *SObject) SObjectField(typeName, key string) *SObject {
 	}
 	oid = url[rIndex+1:]
 
-	object := obj.client().SObject(typeName)
+	object := s.client().SObject(typeName)
 	object.setID(oid)
 	for key, val := range linkedObjMapper {
 		object.Set(key, val)
@@ -286,13 +286,13 @@ func (obj *SObject) SObjectField(typeName, key string) *SObject {
 }
 
 // InterfaceField accesses a field in the SObject as raw interface. This allows access to any type of fields.
-func (obj *SObject) InterfaceField(key string) interface{} {
-	return (*obj)[key]
+func (s *SObject) InterfaceField(key string) interface{} {
+	return (*s)[key]
 }
 
 // AttributesField returns a read-only copy of the attributes field of an SObject.
-func (obj *SObject) AttributesField() *SObjectAttributes {
-	attributes := obj.InterfaceField(sobjectAttributesKey)
+func (s *SObject) AttributesField() *SObjectAttributes {
+	attributes := s.InterfaceField(sobjectAttributesKey)
 
 	switch attributes.(type) {
 	case SObjectAttributes:
@@ -317,51 +317,51 @@ func (obj *SObject) AttributesField() *SObjectAttributes {
 
 // Set indexes value into SObject instance with provided key. The same SObject pointer is returned to allow
 // chained access.
-func (obj *SObject) Set(key string, value interface{}) *SObject {
-	(*obj)[key] = value
-	return obj
+func (s *SObject) Set(key string, value interface{}) *SObject {
+	(*s)[key] = value
+	return s
 }
 
 // client returns the associated Client with the SObject.
-func (obj *SObject) client() *Client {
-	client := obj.InterfaceField(sobjectClientKey)
+func (s *SObject) client() *HTTPClient {
+	client := s.InterfaceField(sobjectClientKey)
 	switch client.(type) {
-	case *Client:
-		return client.(*Client)
+	case *HTTPClient:
+		return client.(*HTTPClient)
 	default:
 		return nil
 	}
 }
 
 // setClient sets the associated Client with the SObject.
-func (obj *SObject) setClient(client *Client) {
-	(*obj)[sobjectClientKey] = client
+func (s *SObject) setClient(client *HTTPClient) {
+	(*s)[sobjectClientKey] = client
 }
 
 // setType sets the type, or name for the SObject.
-func (obj *SObject) setType(typeName string) {
-	attributes := obj.InterfaceField(sobjectAttributesKey)
+func (s *SObject) setType(typeName string) {
+	attributes := s.InterfaceField(sobjectAttributesKey)
 	switch attributes.(type) {
 	case SObjectAttributes:
-		attrs := obj.AttributesField()
+		attrs := s.AttributesField()
 		attrs.Type = typeName
-		(*obj)[sobjectAttributesKey] = *attrs
+		(*s)[sobjectAttributesKey] = *attrs
 	default:
-		(*obj)[sobjectAttributesKey] = SObjectAttributes{
+		(*s)[sobjectAttributesKey] = SObjectAttributes{
 			Type: typeName,
 		}
 	}
 }
 
 // setID sets the external ID for the SObject.
-func (obj *SObject) setID(id string) {
-	(*obj)[sobjectIDKey] = id
+func (s *SObject) setID(id string) {
+	(*s)[sobjectIDKey] = id
 }
 
 // makeCopy copies the fields of an SObject to a new map without metadata fields.
-func (obj *SObject) makeCopy() map[string]interface{} {
+func (s *SObject) makeCopy() map[string]interface{} {
 	stripped := make(map[string]interface{})
-	for key, val := range *obj {
+	for key, val := range *s {
 		if key == sobjectClientKey ||
 			key == sobjectAttributesKey ||
 			key == sobjectIDKey {
