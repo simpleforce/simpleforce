@@ -110,7 +110,7 @@ func (client *Client) CustomRest(path, method string, requestBody io.Reader) ([]
 		return nil, ErrAuthentication
 	}
 
-	u := fmt.Sprintf(client.instanceURL, path)
+	u := fmt.Sprintf("%s/%s", client.instanceURL, path)
 
 	data, err := client.httpRequest(method, u, requestBody)
 	if err != nil {
