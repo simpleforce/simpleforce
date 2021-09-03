@@ -1,6 +1,7 @@
 package simpleforce
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"bytes"
 )
 
 const (
@@ -102,6 +102,23 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	}
 
 	return &result, nil
+}
+
+// CustomRest executes a custom rest request. example endpoint /services/apexrest/custom-endpoint, example method: GET, example requestBody: {"prop": "my-prop"}
+func (client *Client) CustomRest(endpoint, method string, requestBody io.Reader) ([]byte, error) {
+	if !client.isLoggedIn() {
+		return nil, ErrAuthentication
+	}
+
+	u := fmt.Sprintf(client.instanceURL, url.PathEscape(endpoint))
+
+	data, err := client.httpRequest(method, u, requestBody)
+	if err != nil {
+		log.Println(logPrefix, fmt.Sprintf("HTTP %s request failed:", method), u)
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // SObject creates an SObject instance with provided type name and associate the SObject with the client.
