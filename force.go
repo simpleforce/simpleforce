@@ -105,12 +105,12 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 }
 
 // CustomRest executes a custom rest request. example endpoint /services/apexrest/custom-endpoint, example method: GET, example requestBody: {"prop": "my-prop"}
-func (client *Client) CustomRest(endpoint, method string, requestBody io.Reader) ([]byte, error) {
+func (client *Client) CustomRest(path, method string, requestBody io.Reader) ([]byte, error) {
 	if !client.isLoggedIn() {
 		return nil, ErrAuthentication
 	}
 
-	u := fmt.Sprintf(client.instanceURL, url.PathEscape(endpoint))
+	u := fmt.Sprintf(client.instanceURL, path)
 
 	data, err := client.httpRequest(method, u, requestBody)
 	if err != nil {
