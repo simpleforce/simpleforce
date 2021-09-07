@@ -104,8 +104,8 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	return &result, nil
 }
 
-// CustomRest executes a custom rest request. example endpoint /services/apexrest/custom-endpoint, example method: GET, example requestBody: {"prop": "my-prop"}
-func (client *Client) CustomRest(path, method string, requestBody io.Reader) ([]byte, error) {
+// ApexRest executes a custom rest request with the provided method, path, and body. The path is relative to the domain.
+func (client *Client) ApexRest(method, path string, requestBody io.Reader) ([]byte, error) {
 	if !client.isLoggedIn() {
 		return nil, ErrAuthentication
 	}

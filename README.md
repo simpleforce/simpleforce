@@ -16,6 +16,7 @@ Currently, the following functions are implemented and more features could be ad
 * Delete records
 * Download a file
 * Execute anonymous apex
+* Send request to a custom Apex Rest endpoint
 
 Most of the implementation referenced Salesforce documentation here: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_what_is_rest_api.htm
 
