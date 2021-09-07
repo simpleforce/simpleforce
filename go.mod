@@ -1,3 +1,3 @@
-module github.com/russman12/simpleforce
+module gitlab.com/ciorg/supporter/manage-giving/SFUS-External-Projects/simpleforce
 
 go 1.13
