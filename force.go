@@ -104,8 +104,8 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	return &result, nil
 }
 
-// ApexRest executes a custom rest request with the provided method, path, and body. The path is relative to the domain.
-func (client *Client) ApexRest(method, path string, requestBody io.Reader) ([]byte, error) {
+// ApexREST executes a custom rest request with the provided method, path, and body. The path is relative to the domain.
+func (client *Client) ApexREST(method, path string, requestBody io.Reader) ([]byte, error) {
 	if !client.isLoggedIn() {
 		return nil, ErrAuthentication
 	}

@@ -129,7 +129,7 @@ func TestClient_ApexRest(t *testing.T) {
 	client := requireClient(t, true)
 
 	endpoint := "services/apexrest/my-custom-endpoint"
-	result, err := client.ApexRest(endpoint, "POST", strings.NewReader(`{"my-property": "my-value"}`))
+	result, err := client.ApexREST(endpoint, "POST", strings.NewReader(`{"my-property": "my-value"}`))
 	if err != nil {
 		log.Println(logPrefix, "request failed,", err)
 		t.FailNow()
