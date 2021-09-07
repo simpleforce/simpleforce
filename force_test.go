@@ -125,7 +125,7 @@ func TestClient_Query2(t *testing.T) {
 	}
 }
 
-func TestClient_ApexRest(t *testing.T) {
+func TestClient_ApexREST(t *testing.T) {
 	client := requireClient(t, true)
 
 	endpoint := "services/apexrest/my-custom-endpoint"
