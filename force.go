@@ -1,6 +1,7 @@
 package simpleforce
 
 import (
+	"bytes"
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"bytes"
 )
 
 const (
@@ -102,6 +102,23 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 	}
 
 	return &result, nil
+}
+
+// ApexREST executes a custom rest request with the provided method, path, and body. The path is relative to the domain.
+func (client *Client) ApexREST(method, path string, requestBody io.Reader) ([]byte, error) {
+	if !client.isLoggedIn() {
+		return nil, ErrAuthentication
+	}
+
+	u := fmt.Sprintf("%s/%s", client.instanceURL, path)
+
+	data, err := client.httpRequest(method, u, requestBody)
+	if err != nil {
+		log.Println(logPrefix, fmt.Sprintf("HTTP %s request failed:", method), u)
+		return nil, err
+	}
+
+	return data, nil
 }
 
 // SObject creates an SObject instance with provided type name and associate the SObject with the client.
