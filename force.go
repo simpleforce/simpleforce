@@ -293,7 +293,6 @@ func (client *Client) DownloadFile(contentVersionID string, filepath string) err
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Authorization", "Bearer "+client.sessionID)
 
-	// resp, err := http.Get(url)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
