@@ -286,7 +286,7 @@ func (client *Client) DownloadFile(contentVersionID string, filepath string) err
 
 	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/ContentVersion/%s/VersionData", client.apiVersion, contentVersionID)
 
-	baseURL := strings.TrimRight(client.baseURL, "/")
+	baseURL := strings.TrimRight(client.instanceURL, "/")
 	url := fmt.Sprintf("%s%s", baseURL, apiPath)
 
 	// Get the data
