@@ -6,7 +6,7 @@ A simple Golang client for Salesforce
 
 ## Features
 
-`simpleforce` is a library written in Go (Golang) that connects to Salesforce via the REST and Tooling APIs.
+`simpleforce` is a library written in Go (Golang) that connects to Salesforce via the REST API.
 Currently, the following functions are implemented and more features could be added based on need:
 
 * Execute SOQL queries
@@ -15,7 +15,6 @@ Currently, the following functions are implemented and more features could be ad
 * Update records
 * Delete records
 * Download a file
-* Execute anonymous apex
 
 Most of the implementation referenced Salesforce documentation here: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_what_is_rest_api.htm
 
@@ -31,46 +30,43 @@ go get github.com/eleanorhealth/simpleforce
 
 ### Setup the Client
 
-A `client` instance is the main entrance to access Salesforce using simpleforce. Create a `client` instance with the
-`NewClient` function, with the proper endpoint URL:
+Create an `HTTPClient` instance with the
+`NewHTTPClient` function with an oauth2 configured HTTP client and the proper endpoint URL:
 
 ```go
 package main
 
-import "github.com/eleanorhealth/simpleforce"
+import (
+	"context"
+	"log"
 
-var (
-	sfURL      = "Custom or instance URL, for example, 'https://na01.salesforce.com/'"
-	sfUser     = "Username of the Salesforce account."
-	sfPassword = "Password of the Salesforce account."
-	sfToken    = "Security token, could be omitted if Trusted IP is configured."
+	"github.com/eleanorhealth/simpleforce"
+	"golang.org/x/oauth2"
+	"golang.org/x/oauth2/clientcredentials"
 )
 
-func createClient() *simpleforce.Client {
-	client := simpleforce.NewHTTPClient(sfURL, simpleforce.DefaultClientID, simpleforce.DefaultAPIVersion)
-	if client == nil {
-		// handle the error
-
-		return nil
+func main() {
+	oauth2Config := &clientcredentials.Config{
+		ClientID:     "<salesforce client ID",
+		ClientSecret: "<salesforce client secret",
+		TokenURL:     "https://test.salesforce.com/services/oauth2/token",
+		EndpointParams: map[string][]string{
+			"grant_type": {"password"},
+			"username":   {"<salesforce username"},
+			"password":   {"<salesforce password + security token"},
+		},
+		AuthStyle: oauth2.AuthStyleInParams,
 	}
-    
-	err := client.Login(sfUser, sfPassword, sfToken)
-	if err != nil {
-		// handle the error
 
-		return nil
-	}
-    
-	// Do some other stuff with the client instance if needed.
+	httpClient := oauth2Config.Client(context.Background())
 
-	return client
-}
+	client := simpleforce.NewHTTPClient(httpClient, "<salesforce base URL>", simpleforce.DefaultAPIVersion)
 ```
 
 ### Execute a SOQL Query
 
 The `client` provides an interface to run an SOQL Query. Refer to 
-https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/dome_query.htm
+https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_query.htm
 for more details about SOQL.
 
 ```go
@@ -81,20 +77,29 @@ import (
     "github.com/eleanorhealth/simpleforce"
 )
 
-func Query() {
+func main() {
 	client := simpleforce.NewHTTPClient(...)
-	client.Login(...)
 
 	q := "Some SOQL Query String"
-	result, err := client.Query(q) // Note: for Tooling API, use client.Tooling().Query(q)
-	if err != nil {
-		// handle the error
-		return
-	}
+	var nextRecordsURL string
 
-	for _, record := range result.Records {
-		// access the record as SObjects.
-		fmt.Println(record)
+	for {
+		result, err := client.Query(q, nextRecordsURL)
+		if err != nil {
+			// handle the error
+			return
+		}
+		nextURL = result.NextRecordsURL
+
+
+		for _, record := range result.Records {
+			// access the record as SObjects.
+			fmt.Println(record.StringField("SomeField"))
+		}
+
+		if res.Done {
+			break
+		}
 	}
 }
 
@@ -115,15 +120,13 @@ import (
     "github.com/eleanorhealth/simpleforce"
 )
 
-func WorkWithRecords() {
+func main() {
 	client := simpleforce.NewHTTPClient(...)
-	client.Login(...)
 	
 	// Get an SObject with given type and external ID
-	obj := client.SObject("Case").Get("__ID__")
-	if obj == nil {
-		// Object doesn't exist, handle the error
-		return
+	obj, err := client.SObject("Case").Get("<some sobject ID>")
+	if err != nil {
+		log.Fatal(err)
 	}
 	
 	// Attributes are associated with all Salesforce returned SObjects, and can be accessed with the
@@ -137,8 +140,7 @@ func WorkWithRecords() {
 	// Linked objects can be accessed with the `SObjectField` method.
 	userObj := obj.SObjectField("User", "CreatedById")
 	if userObj == nil {
-		// Object doesn't exist, or field "CreatedById" is invalid.
-		return
+		log.Fatal(`Object doesn't exist, or field "CreatedById" is invalid`)
 	}
 	
 	// Linked objects returned normally contains the type and ID field only. A `Get` operation is needed to
@@ -147,45 +149,50 @@ func WorkWithRecords() {
 	
 	// If an SObject instance already has an ID (e.g. linked object), `Get` can retrieve the object directly without
 	// parameter.
-	userObj.Get()
+	userObj, err = userObj.Get()
+	if err != nil {
+		log.Fatal(err)
+	}
 	fmt.Println(userObj.StringField("Name"))    // SUCCESS: returns the name of the user.
 	
 	// For Update(), start with a blank SObject.
 	// Set "Id" with an existing ID and any updated fields.
-	//
-	// Update() will return the updated object, or nil and print an error.
-	updateObj := client.SObject("Contact").								// Create an empty object of type "Contact".
+	err = client.SObject("Contact").									// Create an empty object of type "Contact".
 		Set("Id", "__ID__").											// Set the Id to an existing Contact ID.
 		Set("FirstName", "New Name").									// Set any updated fields.
 		Update()														// Update the record on Salesforce server.
-	fmt.Println(updateObj)
+	if err != nil {
+		log.Fatal(err)
+
 
 	// Many SObject methods return the instance of the SObject, allowing chained access and operations to the
 	// object. In the following example, all methods, except "Delete", returns *SObject so that the next method
 	// can be invoked on the returned value directly.
 	//
 	// Delete() methods returns `error` instead, as Delete is supposed to delete the record from the server.
-	err := client.SObject("Case").                               // Create an empty object of type "Case"
+	err := client.SObject("Case").                               		// Create an empty object of type "Case"
     		Set("Subject", "Case created by simpleforce").              // Set the "Subject" field.
 	        Set("Comments", "Case commented by simpleforce").           // Set the "Comments" field.
     		Create().                                                   // Create the record on Salesforce server.
     		Get().                                                      // Refresh the fields from Salesforce server.
     		Delete()                                                    // Delete the record from Salesforce server.
-	fmt.Println(err)	
+	if err != nil {
+		log.Fatal(err)
+	}
 }
 ```
 
 ### Download a File
 ```go
-// Setup client and login
-// ...
 
 // Get the content version ID
 query := "SELECT Id FROM ContentVersion WHERE ContentDocumentId = '" + YOUR_CONTENTDOCUMENTID + "' AND IsLatest = true"
-result, err = client.Query(query)
+result, err = client.Query(query, "")
 if err != nil {
-    // handle the error
+    // handle error
+    return
 }
+
 contentVersionID := ""
 for _, record := range result.Records {
     contentVersionID = record.StringField("Id")
@@ -200,21 +207,3 @@ if err != nil {
     return
 }   
 ```
-
-### Execute Anonymous Apex
-```go
-// Setup client and login
-// ...
-
-result, err := client.ExecuteAnonymous("System.debug('test anonymous apex');")
-if err != nil {
-    // handle error
-    return
-}
-```
-
-## Development and Unit Test
-
-A set of unit test cases are provided to validate the basic functions of simpleforce. Please do not run these 
-unit tests with a production instance of Salesforce as it would create, modify and delete data from the provided
-Salesforce account.

@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"encoding/xml"
 	"fmt"
-	"log"
 
 	"github.com/pkg/errors"
 )
@@ -27,8 +26,7 @@ type xmlError struct {
 	ErrorCode string `xml:"Body>Fault>faultcode"`
 }
 
-//Need to get information out of this package.
-func ParseSalesforceError(statusCode int, responseBody []byte) (err error) {
+func parseSalesforceError(statusCode int, responseBody []byte) (err error) {
 	jsonError := jsonError{}
 	xmlError := xmlError{}
 	err = json.Unmarshal(responseBody, &jsonError)
@@ -36,8 +34,6 @@ func ParseSalesforceError(statusCode int, responseBody []byte) (err error) {
 		//Unable to parse json. Try xml
 		err = xml.Unmarshal(responseBody, &xmlError)
 		if err != nil {
-			//Unable to parse json or XML
-			log.Println("ERROR UNMARSHALLING: ", err)
 			return ErrFailure
 		}
 		//successfully parsed XML:

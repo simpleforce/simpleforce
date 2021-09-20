@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
@@ -52,23 +54,27 @@ type SObjectAttributes struct {
 
 // Describe queries the metadata of an SObject using the "describe" API.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/resources_sobject_describe.htm
-func (s *SObject) Describe() *SObjectMeta {
+func (s *SObject) Describe() (*SObjectMeta, error) {
 	if s.Type() == "" || s.client() == nil {
 		// Sanity check.
-		return nil
-	}
-	url := s.client().makeURL("sobjects/" + s.Type() + "/describe")
-	data, err := s.client().httpRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return nil
+		return nil, ErrFailure
 	}
 
-	var meta SObjectMeta
-	err = json.Unmarshal(data, &meta)
+	url := s.client().makeURL("sobjects/" + s.Type() + "/describe")
+
+	res, err := s.client().request(http.MethodGet, url, nil, nil)
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	return &meta
+	defer res.Body.Close()
+
+	var meta SObjectMeta
+	err = json.NewDecoder(res.Body).Decode(&meta)
+	if err != nil {
+		return nil, err
+	}
+
+	return &meta, nil
 }
 
 // Get retrieves all the data fields of an SObject. If id is provided, the SObject with the provided external ID will
@@ -76,119 +82,112 @@ func (s *SObject) Describe() *SObjectMeta {
 // and id is not provided as the parameter, nil is returned.
 // If query is successful, the SObject is updated in-place and exact same address is returned; otherwise, nil is
 // returned if failed.
-func (s *SObject) Get(id ...string) *SObject {
+func (s *SObject) Get(id ...string) (*SObject, error) {
 	if s.Type() == "" || s.client() == nil {
 		// Sanity check.
-		return nil
+		return nil, ErrFailure
 	}
 
 	oid := s.ID()
 	if len(id) > 0 {
 		oid = id[0]
 	}
+
 	if oid == "" {
-		log.Println(logPrefix, "object id not found.")
-		return nil
+		return nil, errors.New("object id not found.")
 	}
 
 	url := s.client().makeURL("sobjects/" + s.Type() + "/" + oid)
-	data, err := s.client().httpRequest(http.MethodGet, url, nil)
+
+	res, err := s.client().request(http.MethodGet, url, nil, nil)
 	if err != nil {
-		log.Println(logPrefix, "http request failed,", err)
-		return nil
+		return nil, err
+	}
+	defer res.Body.Close()
+
+	err = json.NewDecoder(res.Body).Decode(s)
+	if err != nil {
+		return nil, err
 	}
 
-	err = json.Unmarshal(data, s)
-	if err != nil {
-		log.Println(logPrefix, "json decode failed,", err)
-		return nil
-	}
+	return s, nil
+}
 
-	return s
+type createSObjectResponse struct {
+	ID      string `json:"id"`
+	Success bool   `json:"success"`
 }
 
 // Create posts the JSON representation of the SObject to salesforce to create the entry.
 // If the creation is successful, the ID of the SObject instance is updated with the ID returned. Otherwise, nil is
 // returned for failures.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_sobject_create.htm
-func (s *SObject) Create() *SObject {
+func (s *SObject) Create(blacklistedFields []string) (*SObject, error) {
 	if s.Type() == "" || s.client() == nil {
 		// Sanity check.
-		return nil
+		return nil, ErrFailure
 	}
-
 	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
-	reqObj := s.makeCopy()
+	reqObj := s.makeCopy(blacklistedFields)
 	reqData, err := json.Marshal(reqObj)
 	if err != nil {
-		log.Println(logPrefix, "failed to convert sobject to json,", err)
-		return nil
+		return nil, err
 	}
 
 	url := s.client().makeURL("sobjects/" + s.Type() + "/")
-	respData, err := s.client().httpRequest(http.MethodPost, url, bytes.NewReader(reqData))
+
+	res, err := s.client().request(http.MethodPost, url, bytes.NewReader(reqData), nil)
 	if err != nil {
-		log.Println(logPrefix, "failed to process http request,", err)
-		return nil
+		return nil, err
 	}
+	defer res.Body.Close()
 
-	// Use an anonymous struct to parse the result if any. This might need to be changed if the result should
-	// be returned to the caller in some manner, especially if the client would like to decode the errors.
-	var respVal struct {
-		ID      string `json:"id"`
-		Success bool   `json:"success"`
-	}
-	err = json.Unmarshal(respData, &respVal)
+	var resData *createSObjectResponse
+
+	err = json.NewDecoder(res.Body).Decode(&resData)
 	if err != nil {
-		log.Println(logPrefix, "failed to process response data,", err)
-		return nil
+		return nil, err
 	}
 
-	if !respVal.Success || respVal.ID == "" {
-		log.Println(logPrefix, "unsuccessful")
-		return nil
+	if !resData.Success || resData.ID == "" {
+		return nil, ErrFailure
 	}
 
-	s.setID(respVal.ID)
-	return s
+	s.setID(resData.ID)
+
+	return s, nil
 }
 
-// Update updates SObject in place. Upon successful, same SObject is returned for chained access.
+// Update updates SObject in place.
 // ID is required.
-func (s *SObject) Update() *SObject {
+func (s *SObject) Update(blacklistedFields []string) error {
 	if s.Type() == "" || s.client() == nil || s.ID() == "" {
-		// Sanity check.
-		return nil
+		return ErrFailure
+
 	}
 
 	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
-	reqObj := s.makeCopy()
+	reqObj := s.makeCopy(blacklistedFields)
 	reqData, err := json.Marshal(reqObj)
 	if err != nil {
-		log.Println(logPrefix, "failed to convert sobject to json,", err)
-		return nil
+		return err
 	}
 
-	queryBase := "sobjects/"
-	if s.client().useToolingAPI {
-		queryBase = "tooling/sobjects/"
-	}
-	url := s.client().makeURL(queryBase + s.Type() + "/" + s.ID())
-	respData, err := s.client().httpRequest(http.MethodPatch, url, bytes.NewReader(reqData))
+	url := s.client().makeURL("sobjects/" + s.Type() + "/" + s.ID())
+
+	res, err := s.client().request(http.MethodPatch, url, bytes.NewReader(reqData), nil)
 	if err != nil {
-		log.Println(logPrefix, "failed to process http request,", err)
-		return nil
+		return err
 	}
-	log.Println(string(respData))
+	defer res.Body.Close()
 
-	return s
+	return nil
 }
 
 // Delete deletes an SObject record identified by external ID. nil is returned if the operation completes successfully;
 // otherwise an error is returned
 func (s *SObject) Delete(id ...string) error {
 	if s.Type() == "" || s.client() == nil {
-		// Sanity check
 		return ErrFailure
 	}
 
@@ -201,8 +200,8 @@ func (s *SObject) Delete(id ...string) error {
 	}
 
 	url := s.client().makeURL("sobjects/" + s.Type() + "/" + s.ID())
-	log.Println(url)
-	_, err := s.client().httpRequest(http.MethodDelete, url, nil)
+
+	_, err := s.client().request(http.MethodDelete, url, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -227,9 +226,10 @@ func (obj *SObject) ID() string {
 // StringField accesses a field in the SObject as string. Empty string is returned if the field doesn't exist.
 func (s *SObject) StringField(key string) string {
 	value := s.InterfaceField(key)
-	switch value.(type) {
+
+	switch v := value.(type) {
 	case string:
-		return value.(string)
+		return v
 	default:
 		return ""
 	}
@@ -245,6 +245,7 @@ func (s *SObject) SObjectField(typeName, key string) *SObject {
 		object.setClient(s.client())
 		object.setType(typeName)
 		object.setID(oid)
+
 		return object
 	}
 
@@ -254,6 +255,7 @@ func (s *SObject) SObjectField(typeName, key string) *SObject {
 	if !ok {
 		return nil
 	}
+
 	attrs, ok := linkedObjMapper[sobjectAttributesKey].(map[string]interface{})
 	if !ok {
 		return nil
@@ -274,10 +276,12 @@ func (s *SObject) SObjectField(typeName, key string) *SObject {
 		log.Println(logPrefix, "invalid url,", url)
 		return nil
 	}
+
 	oid = url[rIndex+1:]
 
 	object := s.client().SObject(typeName)
 	object.setID(oid)
+
 	for key, val := range linkedObjMapper {
 		object.Set(key, val)
 	}
@@ -303,12 +307,15 @@ func (s *SObject) AttributesField() *SObjectAttributes {
 		// Can't convert attributes to concrete type; decode interface.
 		mapper := attributes.(map[string]interface{})
 		attrs := &SObjectAttributes{}
+
 		if mapper["type"] != nil {
 			attrs.Type = mapper["type"].(string)
 		}
+
 		if mapper["url"] != nil {
 			attrs.URL = mapper["url"].(string)
 		}
+
 		return attrs
 	default:
 		return nil
@@ -325,9 +332,10 @@ func (s *SObject) Set(key string, value interface{}) *SObject {
 // client returns the associated Client with the SObject.
 func (s *SObject) client() *HTTPClient {
 	client := s.InterfaceField(sobjectClientKey)
-	switch client.(type) {
+
+	switch c := client.(type) {
 	case *HTTPClient:
-		return client.(*HTTPClient)
+		return c
 	default:
 		return nil
 	}
@@ -341,6 +349,7 @@ func (s *SObject) setClient(client *HTTPClient) {
 // setType sets the type, or name for the SObject.
 func (s *SObject) setType(typeName string) {
 	attributes := s.InterfaceField(sobjectAttributesKey)
+
 	switch attributes.(type) {
 	case SObjectAttributes:
 		attrs := s.AttributesField()
@@ -359,8 +368,9 @@ func (s *SObject) setID(id string) {
 }
 
 // makeCopy copies the fields of an SObject to a new map without metadata fields.
-func (s *SObject) makeCopy() map[string]interface{} {
+func (s *SObject) makeCopy(blacklistedFields []string) map[string]interface{} {
 	stripped := make(map[string]interface{})
+
 	for key, val := range *s {
 		if key == sobjectClientKey ||
 			key == sobjectAttributesKey ||
@@ -369,8 +379,14 @@ func (s *SObject) makeCopy() map[string]interface{} {
 		}
 		stripped[key] = val
 	}
+
 	for _, key := range blacklistedUpdateFields {
 		delete(stripped, key)
 	}
+
+	for _, key := range blacklistedFields {
+		delete(stripped, key)
+	}
+
 	return stripped
 }
