@@ -9,12 +9,17 @@ import (
 )
 
 var (
-	// ErrFailure is a generic error if none of the other errors are appropriate.
-	ErrFailure = errors.New("general failure")
-
-	// ErrAuthentication is returned when authentication failed.
 	ErrAuthentication = errors.New("authentication failure")
+	ErrFailure        = errors.New("general failure")
 )
+
+type ErrInvalidSObject struct {
+	msg string
+}
+
+func (e ErrInvalidSObject) Error() string {
+	return fmt.Sprintf("invalid sobject: %s", e.msg)
+}
 
 type jsonError []struct {
 	Message   string `json:"message"`

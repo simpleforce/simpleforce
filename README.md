@@ -107,10 +107,7 @@ func main() {
 
 ### Work with Records
 
-`SObject` instances are created by `client` instance, either through the return values of `client.Query()`
-or through `client.SObject()` directly. Once an `SObject` instance is created, it can be used to Create, Delete, Update,
-or Get records through the Salesforce REST API. Here are some examples of using `SObject` instances to work on the
-records.
+`SObject` instances are returned as records in the result of `client.Query()` but can also be created manually using `NewSObject()`. `SObject` instances can be created, read, updated, or deleted using the `CreateSObject()`, `GetSObject()`, `UpdateSObject()`, and `DeleteSObject()` methods on `HTTPClient`.
 
 ```go
 package main
@@ -124,7 +121,9 @@ func main() {
 	client := simpleforce.NewHTTPClient(...)
 	
 	// Get an SObject with given type and external ID
-	obj, err := client.SObject("Case").Get("<some sobject ID>")
+	obj := simpleforce.NewSObject("Case").SetID("<some sobject ID>")
+
+	err := client.GetSObject(obj)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,46 +135,21 @@ func main() {
 	 	fmt.Println(attrs.Type)    // "Case" 
 		fmt.Println(attrs.URL)     // "/services/data/v43.0/case/__ID__"
 	}
-	
-	// Linked objects can be accessed with the `SObjectField` method.
-	userObj := obj.SObjectField("User", "CreatedById")
-	if userObj == nil {
-		log.Fatal(`Object doesn't exist, or field "CreatedById" is invalid`)
-	}
-	
-	// Linked objects returned normally contains the type and ID field only. A `Get` operation is needed to
-	// retrieve all the information of linked objects.
-	fmt.Println(userObj.StringField("Name"))    // FAIL: fields are not populated.
-	
-	// If an SObject instance already has an ID (e.g. linked object), `Get` can retrieve the object directly without
-	// parameter.
-	userObj, err = userObj.Get()
-	if err != nil {
-		log.Fatal(err)
-	}
-	fmt.Println(userObj.StringField("Name"))    // SUCCESS: returns the name of the user.
-	
+
 	// For Update(), start with a blank SObject.
 	// Set "Id" with an existing ID and any updated fields.
-	err = client.SObject("Contact").									// Create an empty object of type "Contact".
-		Set("Id", "__ID__").											// Set the Id to an existing Contact ID.
-		Set("FirstName", "New Name").									// Set any updated fields.
-		Update()														// Update the record on Salesforce server.
+	contractObj := NewSObject("Contract").
+		SetID("<some sobject ID">).										// Set the Id to an existing Contact ID.
+		Set("FirstName", "New Name")									// Set any updated fields.
+		
+	err = client.UpdateSObject(contractObj)								// Update the record on Salesforce server.
 	if err != nil {
 		log.Fatal(err)
 
 
-	// Many SObject methods return the instance of the SObject, allowing chained access and operations to the
-	// object. In the following example, all methods, except "Delete", returns *SObject so that the next method
-	// can be invoked on the returned value directly.
-	//
-	// Delete() methods returns `error` instead, as Delete is supposed to delete the record from the server.
-	err := client.SObject("Case").                               		// Create an empty object of type "Case"
-    		Set("Subject", "Case created by simpleforce").              // Set the "Subject" field.
-	        Set("Comments", "Case commented by simpleforce").           // Set the "Comments" field.
-    		Create().                                                   // Create the record on Salesforce server.
-    		Get().                                                      // Refresh the fields from Salesforce server.
-    		Delete()                                                    // Delete the record from Salesforce server.
+
+	caseObj := NewSObject("Case").SetID("<some sobject ID">)
+	err = client.DeleteSObject(caseObj)                                                    // Delete the record from Salesforce server.
 	if err != nil {
 		log.Fatal(err)
 	}
