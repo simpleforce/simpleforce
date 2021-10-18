@@ -286,17 +286,13 @@ func (client *Client) DownloadFile(contentVersionID string, filepath string) err
 
 	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/ContentVersion/%s/VersionData", client.apiVersion, contentVersionID)
 
-	baseURL := strings.TrimRight(client.baseURL, "/")
-	url := fmt.Sprintf("%s%s", baseURL, apiPath)
-
 	// Get the data
 	httpClient := client.httpClient
-	req, err := http.NewRequest("GET", url, nil)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s%s", strings.TrimRight(client.instanceURL, "/"), apiPath), nil)
 	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Authorization", "Bearer "+client.sessionID)
 
-	// resp, err := http.Get(url)
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return err
