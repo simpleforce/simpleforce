@@ -270,9 +270,9 @@ func NewClient(url, clientID, apiVersion string) *Client {
 		httpClient: &http.Client{},
 	}
 
-	// Append "/" to the end of baseURL if not yet.
-	if !strings.HasSuffix(client.baseURL, "/") {
-		client.baseURL = client.baseURL + "/"
+	// Remove trailing "/" from base url to prevent "//" when paths are appended
+	if strings.HasSuffix(client.baseURL, "/") {
+		client.baseURL = client.baseURL[:len(client.baseURL)-1]
 	}
 	return client
 }
