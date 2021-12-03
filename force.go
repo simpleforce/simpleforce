@@ -283,9 +283,16 @@ func (client *Client) SetHttpClient(c *http.Client) {
 
 // DownloadFile downloads a file based on the REST API path given. Saves to filePath.
 func (client *Client) DownloadFile(contentVersionID string, filepath string) error {
-
 	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/ContentVersion/%s/VersionData", client.apiVersion, contentVersionID)
+	return client.download(apiPath, filepath)
+}
 
+func (client *Client) DownloadAttachment(attachmentId string, filepath string) error {
+	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/Attachment/%s/Body", client.apiVersion, attachmentId)
+	return client.download(apiPath, filepath)
+}
+
+func (client *Client) download(apiPath string, filepath string) error {
 	// Get the data
 	httpClient := client.httpClient
 	req, err := http.NewRequest("GET", fmt.Sprintf("%s%s", strings.TrimRight(client.instanceURL, "/"), apiPath), nil)
