@@ -299,6 +299,12 @@ func (client *Client) DownloadFile(contentVersionID string, filepath string) err
 	}
 	defer resp.Body.Close()
 
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		return fmt.Errorf("ERROR: statuscode: %d, body: %s", resp.StatusCode, buf.String())
+	}
+
 	// Create the file
 	out, err := os.Create(filepath)
 	if err != nil {
