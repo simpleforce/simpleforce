@@ -25,6 +25,7 @@ type Client interface {
 	CreateSObject(sobj *SObject, blacklistedFields []string) error
 	GetSObject(sobj *SObject) error
 	UpdateSObject(sobj *SObject, blacklistedFields []string) error
+	UpsertSObject(sobject *SObject, idField, idValue string, blacklistedFields []string) error
 	DeleteSObject(sobj *SObject) error
 
 	DescribeGlobal() (*SObjectMeta, error)
@@ -202,6 +203,30 @@ func (h *HTTPClient) UpdateSObject(sobj *SObject, blacklistedFields []string) er
 	}
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/" + sobj.ID())
+
+	res, err := h.request(http.MethodPatch, url, bytes.NewReader(reqData), nil)
+	if err != nil {
+		return err
+	}
+	defer res.Body.Close()
+
+	return nil
+}
+
+// UpsertSObject upserts SObject.
+func (h *HTTPClient) UpsertSObject(sobj *SObject, idField, idValue string, blacklistedFields []string) error {
+	if len(sobj.Type()) == 0 {
+		return ErrInvalidSObject{"Type is empty"}
+	}
+
+	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
+	reqObj := sobj.makeCopy(blacklistedFields)
+	reqData, err := json.Marshal(reqObj)
+	if err != nil {
+		return err
+	}
+
+	url := h.makeURL("sobjects/" + sobj.Type() + "/" + idField + "/" + idValue)
 
 	res, err := h.request(http.MethodPatch, url, bytes.NewReader(reqData), nil)
 	if err != nil {
