@@ -16,13 +16,15 @@ const (
 	DefaultClientID   = "simpleforce"
 
 	logPrefix = "[simpleforce]"
+
+	duplicateRuleHeader = "Sforce-Duplicate-Rule-Header"
 )
 
 type Client interface {
 	Query(query, nextRecordsURL string) (*QueryResult, error)
 
 	DescribeSObject(sobj *SObject) (*SObjectMeta, error)
-	CreateSObject(sobj *SObject, blacklistedFields []string) error
+	CreateSObject(sobj *SObject, blacklistedFields []string, allowDuplicates bool) error
 	GetSObject(sobj *SObject) error
 	UpdateSObject(sobj *SObject, blacklistedFields []string) error
 	UpsertSObject(sobject *SObject, idField, idValue string, blacklistedFields []string) error
@@ -123,7 +125,7 @@ type createSObjectResponse struct {
 // CreateSObject POSTs the JSON representation of the SObject to salesforce to create the entry.
 // If the creation is successful, the ID of the SObject instance is updated with the ID returned.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_sobject_create.htm
-func (h *HTTPClient) CreateSObject(sobj *SObject, blacklistedFields []string) error {
+func (h *HTTPClient) CreateSObject(sobj *SObject, blacklistedFields []string, allowDuplicates bool) error {
 	if len(sobj.Type()) == 0 {
 		return ErrInvalidSObject{"Type is empty"}
 	}
@@ -137,7 +139,13 @@ func (h *HTTPClient) CreateSObject(sobj *SObject, blacklistedFields []string) er
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/")
 
-	res, err := h.request(http.MethodPost, url, bytes.NewReader(reqData), nil)
+	var headers http.Header
+	if allowDuplicates {
+		headers = http.Header{}
+		headers.Set(duplicateRuleHeader, "allowSave=true")
+	}
+
+	res, err := h.request(http.MethodPost, url, bytes.NewReader(reqData), headers)
 	if err != nil {
 		return err
 	}

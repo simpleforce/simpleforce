@@ -139,6 +139,7 @@ func TestHTTPClient_Create(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		assert.Equal(r.Method, http.MethodPost)
 		assert.Contains(r.URL.Path, "sobjects/"+objType)
+		assert.NotContains(r.Header, duplicateRuleHeader)
 
 		err := json.NewEncoder(w).Encode(res)
 		assert.NoError(err)
@@ -150,7 +151,42 @@ func TestHTTPClient_Create(t *testing.T) {
 		SetID(id).
 		Set("OwnerId", ownerID)
 
-	err := client.CreateSObject(sobj, nil)
+	err := client.CreateSObject(sobj, nil, false)
+	assert.NoError(err)
+	assert.NotNil(sobj)
+
+	assert.Equal(ownerID, sobj.StringField("OwnerId"))
+	assert.Equal(objType, sobj.Type())
+}
+
+func TestHTTPClient_Create_allow_duplicates(t *testing.T) {
+	assert := assert.New(t)
+
+	id := "object1"
+	ownerID := "owner1"
+	objType := "Case"
+
+	res := &createSObjectResponse{
+		ID:      id,
+		Success: true,
+	}
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		assert.Equal(r.Method, http.MethodPost)
+		assert.Contains(r.URL.Path, "sobjects/"+objType)
+		assert.Equal(r.Header.Get(duplicateRuleHeader), "allowSave=true")
+
+		err := json.NewEncoder(w).Encode(res)
+		assert.NoError(err)
+	}))
+
+	client := NewHTTPClient(ts.Client(), ts.URL, DefaultAPIVersion)
+
+	sobj := NewSObject(objType).
+		SetID(id).
+		Set("OwnerId", ownerID)
+
+	err := client.CreateSObject(sobj, nil, true)
 	assert.NoError(err)
 	assert.NotNil(sobj)
 
