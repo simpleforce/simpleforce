@@ -6,12 +6,15 @@ import (
 	"log"
 	"net/http"
 	"strings"
+
+	"github.com/pkg/errors"
 )
 
 const (
-	sobjectClientKey     = "__client__" // private attribute added to locate client instance.
-	sobjectAttributesKey = "attributes" // points to the attributes structure which should be common to all SObjects.
-	sobjectIDKey         = "Id"
+	sobjectClientKey              = "__client__" // private attribute added to locate client instance.
+	sobjectAttributesKey          = "attributes" // points to the attributes structure which should be common to all SObjects.
+	sobjectIDKey                  = "Id"
+	sobjectExternalIDFieldNameKey = "ExternalIDField"
 )
 
 var (
@@ -132,24 +135,12 @@ func (obj *SObject) Create() *SObject {
 		return nil
 	}
 
-	// Use an anonymous struct to parse the result if any. This might need to be changed if the result should
-	// be returned to the caller in some manner, especially if the client would like to decode the errors.
-	var respVal struct {
-		ID      string `json:"id"`
-		Success bool   `json:"success"`
-	}
-	err = json.Unmarshal(respData, &respVal)
+	err = obj.setIDFromResponseData(respData)
 	if err != nil {
-		log.Println(logPrefix, "failed to process response data,", err)
+		log.Println(logPrefix, "failed to parse response,", err)
 		return nil
 	}
 
-	if !respVal.Success || respVal.ID == "" {
-		log.Println(logPrefix, "unsuccessful")
-		return nil
-	}
-
-	obj.setID(respVal.ID)
 	return obj
 }
 
@@ -180,6 +171,51 @@ func (obj *SObject) Update() *SObject {
 		return nil
 	}
 	log.Println(string(respData))
+
+	return obj
+}
+
+// Upsert creates SObject or updates existing SObject in place. Upon successful upsert, same SObject is returned for chained access.
+// ID, ExternalIDField and Type are required. ID is the value of the external ID in this case.
+func (obj *SObject) Upsert() *SObject {
+	log.Println(logPrefix, "ExternalID:", obj.ExternalID())
+	log.Println(logPrefix, "ExternalIDField:", obj.ExternalIDFieldName())
+	if obj.Type() == "" || obj.client() == nil || obj.ExternalIDFieldName() == "" ||
+		obj.ExternalID() == "" {
+		// Sanity check.
+		log.Println(logPrefix, "required fields are missing")
+		return nil
+	}
+
+	// Make a copy of the incoming SObject, but skip certain metadata fields as they're not understood by salesforce.
+	reqObj := obj.makeCopy()
+	reqData, err := json.Marshal(reqObj)
+	if err != nil {
+		log.Println(logPrefix, "failed to convert sobject to json,", err)
+		return nil
+	}
+
+	queryBase := "sobjects/"
+	if obj.client().useToolingAPI {
+		queryBase = "tooling/sobjects/"
+	}
+	url := obj.client().
+		makeURL(queryBase + obj.Type() + "/" + obj.ExternalIDFieldName() + "/" + obj.ExternalID())
+	respData, err := obj.client().httpRequest(http.MethodPatch, url, bytes.NewReader(reqData))
+	if err != nil {
+		log.Println(logPrefix, "failed to process http request,", err)
+		return nil
+	}
+
+	// Upsert returns with 201 and id in response if a new record is created. If a record is updated, it returns
+	// a 204 with an empty response
+	if len(respData) > 0 {
+		err = obj.setIDFromResponseData(respData)
+		if err != nil {
+			log.Println(logPrefix, "failed to parse response,", err)
+			return nil
+		}
+	}
 
 	return obj
 }
@@ -224,6 +260,16 @@ func (obj *SObject) ID() string {
 	return obj.StringField(sobjectIDKey)
 }
 
+// ExternalIDField returns the external ID field of the SObject.
+func (obj *SObject) ExternalIDFieldName() string {
+	return obj.StringField(sobjectExternalIDFieldNameKey)
+}
+
+// ExternalID returns the external ID of the SObject.
+func (obj *SObject) ExternalID() string {
+	return obj.StringField(obj.ExternalIDFieldName())
+}
+
 // StringField accesses a field in the SObject as string. Empty string is returned if the field doesn't exist.
 func (obj *SObject) StringField(key string) string {
 	value := obj.InterfaceField(key)
@@ -260,8 +306,8 @@ func (obj *SObject) SObjectField(typeName, key string) *SObject {
 	}
 
 	// Reusing typeName here, which is ok
-	typeName, ok = attrs["type"].(string)
-	url, ok := attrs["url"].(string)
+	typeName, _ = attrs["type"].(string)
+	url, _ := attrs["url"].(string)
 	if typeName == "" || url == "" {
 		return nil
 	}
@@ -364,7 +410,9 @@ func (obj *SObject) makeCopy() map[string]interface{} {
 	for key, val := range *obj {
 		if key == sobjectClientKey ||
 			key == sobjectAttributesKey ||
-			key == sobjectIDKey {
+			key == sobjectIDKey ||
+			key == sobjectExternalIDFieldNameKey ||
+			key == obj.ExternalIDFieldName() {
 			continue
 		}
 		stripped[key] = val
@@ -373,4 +421,26 @@ func (obj *SObject) makeCopy() map[string]interface{} {
 		delete(stripped, key)
 	}
 	return stripped
+}
+
+func (obj *SObject) setIDFromResponseData(respData []byte) error {
+	// Use an anonymous struct to parse the result if any. This might need to be changed if the result should
+	// be returned to the caller in some manner, especially if the client would like to decode the errors.
+	var respVal struct {
+		ID      string `json:"id"`
+		Success bool   `json:"success"`
+	}
+	err := json.Unmarshal(respData, &respVal)
+	if err != nil {
+		log.Println(logPrefix, "failed to process response data,", err)
+		return err
+	}
+
+	if !respVal.Success || respVal.ID == "" {
+		log.Println(logPrefix, "unsuccessful")
+		return errors.New("request was unsuccessful")
+	}
+
+	obj.setID(respVal.ID)
+	return nil
 }

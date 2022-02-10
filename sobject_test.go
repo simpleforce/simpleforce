@@ -4,6 +4,8 @@ import (
 	"log"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func TestSObject_AttributesField(t *testing.T) {
@@ -193,6 +195,74 @@ func TestSObject_Update(t *testing.T) {
 		Update().
 		Get().
 		StringField("Subject") != "Case subject updated by simpleforce" {
+		t.Fail()
+	}
+}
+
+func TestSObject_Upsert(t *testing.T) {
+	client := requireClient(t, true)
+
+	// Positive create new object through upsert
+	case1 := client.SObject("Case")
+	case1Result := case1.Set("Subject", "Case created by simpleforce on "+time.Now().Format("2006/01/02 03:04:05")).
+		Set("Comments", "This case is created by simpleforce").
+		Set("customExtIdField__c", uuid.NewString()).
+		Set("ExternalIDField", "customExtIdField__c").
+		Upsert()
+	if case1Result == nil || case1Result.ID() == "" || case1Result.Type() != case1.Type() {
+		t.Fail()
+	} else {
+		log.Println(logPrefix, "Case created,", case1Result.Get().StringField("CaseNumber"))
+	}
+
+	// Positive update existing object through upsert
+	case2 := client.SObject("Case").
+		Set("Subject", "Case created by simpleforce on "+time.Now().Format("2006/01/02 03:04:05")).
+		Set("customExtIdField__c", uuid.NewString())
+	case2Result := case2.Create()
+	case2.
+		Set("Subject", "Case subject updated by simpleforce").
+		Set("ExternalIDField", "customExtIdField__c").
+		Upsert()
+	if case2Result.Get().StringField("Subject") != "Case subject updated by simpleforce" {
+		t.Fail()
+	} else {
+		log.Println(logPrefix, "Case updated,", case2Result.Get().StringField("CaseNumber"))
+	}
+
+	// Negative: object without type.
+	obj := client.SObject()
+	if obj.Upsert() != nil {
+		t.Fail()
+	}
+
+	// Negative: object without client.
+	obj = &SObject{}
+	if obj.Upsert() != nil {
+		t.Fail()
+	}
+
+	// Negative: Invalid type
+	obj = client.SObject("__SOME_INVALID_TYPE__").
+		Set("ExternalIDField", "customExtIdField__c").
+		Set("customExtIdField__c", uuid.NewString())
+	if obj.Upsert() != nil {
+		t.Fail()
+	}
+
+	// Negative: Invalid field
+	obj = client.SObject("Case").
+		Set("ExternalIDField", "customExtIdField__c").
+		Set("customExtIdField__c", uuid.NewString()).
+		Set("__SOME_INVALID_FIELD__", "")
+	if obj.Upsert() != nil {
+		t.Fail()
+	}
+
+	// Negative: Missing ext ID
+	obj = client.SObject("Case").
+		Set("ExternalIDField", "customExtIdField__c")
+	if obj.Upsert() != nil {
 		t.Fail()
 	}
 }
