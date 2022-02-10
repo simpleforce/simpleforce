@@ -9,14 +9,15 @@ A simple Golang client for Salesforce
 `simpleforce` is a library written in Go (Golang) that connects to Salesforce via the REST and Tooling APIs.
 Currently, the following functions are implemented and more features could be added based on need:
 
-* Execute SOQL queries
-* Get records via record (sobject) type and ID
-* Create records
-* Update records
-* Delete records
-* Download a file
-* Execute anonymous apex
-* Send request to a custom Apex Rest endpoint
+- Execute SOQL queries
+- Get records via record (sobject) type and ID
+- Create records
+- Update records
+- Delete records
+- Upsert (create or update) records based on an external ID
+- Download a file
+- Execute anonymous apex
+- Send request to a custom Apex Rest endpoint
 
 Most of the implementation referenced Salesforce documentation here: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/intro_what_is_rest_api.htm
 
@@ -54,14 +55,14 @@ func createClient() *simpleforce.Client {
 
 		return nil
 	}
-    
+
 	err := client.LoginPassword(sfUser, sfPassword, sfToken)
 	if err != nil {
 		// handle the error
 
 		return nil
 	}
-    
+
 	// Do some other stuff with the client instance if needed.
 
 	return client
@@ -70,7 +71,7 @@ func createClient() *simpleforce.Client {
 
 ### Execute a SOQL Query
 
-The `client` provides an interface to run an SOQL Query. Refer to 
+The `client` provides an interface to run an SOQL Query. Refer to
 https://developer.salesforce.com/docs/atlas.en-us.api_rest.meta/api_rest/dome_query.htm
 for more details about SOQL.
 
@@ -119,38 +120,38 @@ import (
 func WorkWithRecords() {
 	client := simpleforce.NewClient(...)
 	client.LoginPassword(...)
-	
+
 	// Get an SObject with given type and external ID
 	obj := client.SObject("Case").Get("__ID__")
 	if obj == nil {
 		// Object doesn't exist, handle the error
 		return
 	}
-	
+
 	// Attributes are associated with all Salesforce returned SObjects, and can be accessed with the
 	// `AttributesField` method.
 	attrs := obj.AttributesField()
 	if attrs != nil {
-	 	fmt.Println(attrs.Type)    // "Case" 
+	 	fmt.Println(attrs.Type)    // "Case"
 		fmt.Println(attrs.URL)     // "/services/data/v43.0/case/__ID__"
 	}
-	
+
 	// Linked objects can be accessed with the `SObjectField` method.
 	userObj := obj.SObjectField("User", "CreatedById")
 	if userObj == nil {
 		// Object doesn't exist, or field "CreatedById" is invalid.
 		return
 	}
-	
+
 	// Linked objects returned normally contains the type and ID field only. A `Get` operation is needed to
 	// retrieve all the information of linked objects.
 	fmt.Println(userObj.StringField("Name"))    // FAIL: fields are not populated.
-	
+
 	// If an SObject instance already has an ID (e.g. linked object), `Get` can retrieve the object directly without
 	// parameter.
 	userObj.Get()
 	fmt.Println(userObj.StringField("Name"))    // SUCCESS: returns the name of the user.
-	
+
 	// For Update(), start with a blank SObject.
 	// Set "Id" with an existing ID and any updated fields.
 	//
@@ -160,6 +161,19 @@ func WorkWithRecords() {
 		Set("FirstName", "New Name").									// Set any updated fields.
 		Update()														// Update the record on Salesforce server.
 	fmt.Println(updateObj)
+
+	// For Upsert(), start with a blank SObject.
+	// Upsert will create the object if it does not already exist and will update the object if it already exists.
+	// Set "ExternalIDField" to the name of your external ID field
+	// and populate that field with an your external ID and any updated fields.
+	//
+	// Upsert() will return the updated object, or nil and print an error.
+	upsertObj := client.SObject("Contact").						// Create an empty object of type "Contact".
+		Set("ExternalIDField", "customExtIdField__c").	// Set the ExternalIDField to the name of your external ID field.
+		Set("customExtIdField__c", "__ExtID__").				// Set the specified ID field to your external ID.
+		Set("FirstName", "New Name").										// Set any updated fields.
+		Upsert()																				// Update the record on Salesforce server.
+	fmt.Println(upsertObj)
 
 	// Many SObject methods return the instance of the SObject, allowing chained access and operations to the
 	// object. In the following example, all methods, except "Delete", returns *SObject so that the next method
@@ -172,11 +186,12 @@ func WorkWithRecords() {
     		Create().                                                   // Create the record on Salesforce server.
     		Get().                                                      // Refresh the fields from Salesforce server.
     		Delete()                                                    // Delete the record from Salesforce server.
-	fmt.Println(err)	
+	fmt.Println(err)
 }
 ```
 
 ### Download a File
+
 ```go
 // Setup client and login
 // ...
@@ -199,10 +214,11 @@ err = client.DownloadFile(contentVersionID, downloadFilePath)
 if err != nil {
     // handle error
     return
-}   
+}
 ```
 
 ### Execute Anonymous Apex
+
 ```go
 // Setup client and login
 // ...
@@ -216,9 +232,11 @@ if err != nil {
 
 ## Development and Unit Test
 
-A set of unit test cases are provided to validate the basic functions of simpleforce. Please do not run these 
+A set of unit test cases are provided to validate the basic functions of simpleforce. Please do not run these
 unit tests with a production instance of Salesforce as it would create, modify and delete data from the provided
 Salesforce account.
+
+The unit test requires a custom field `customExtIdField__c` to be present on the Type `Case` in your Salesforce setup.
 
 ## License and Acknowledgement
 
