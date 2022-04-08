@@ -125,6 +125,28 @@ func TestClient_Query2(t *testing.T) {
 	}
 }
 
+func TestClient_Query3(t *testing.T) {
+	client := requireClient(t, true)
+
+	q := "SELECT Id FROM CaseComment WHERE CommentBody = 'This comment is created by simpleforce & used for testing'"
+	result, err := client.Query(q)
+	if err != nil {
+		log.Println(logPrefix, "query failed,", err)
+		t.FailNow()
+	}
+
+	log.Println(logPrefix, result.TotalSize, result.Done, result.NextRecordsURL)
+	if result.TotalSize < 1 {
+		log.Println(logPrefix, "no records returned.")
+		t.FailNow()
+	}
+	for _, record := range result.Records {
+		if record.Type() != "CaseComment" {
+			t.Fail()
+		}
+	}
+}
+
 func TestClient_ApexREST(t *testing.T) {
 	client := requireClient(t, true)
 

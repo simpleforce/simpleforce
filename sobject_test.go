@@ -150,7 +150,7 @@ func TestSObject_Create(t *testing.T) {
 	// Positive 2
 	caseComment1 := client.SObject("CaseComment")
 	caseComment1Result := caseComment1.Set("ParentId", case1Result.ID()).
-		Set("CommentBody", "This comment is created by simpleforce").
+		Set("CommentBody", "This comment is created by simpleforce & used for testing").
 		Set("IsPublished", true).
 		Create()
 	if caseComment1Result.Get().SObjectField("Case", "ParentId").ID() != case1Result.ID() {
