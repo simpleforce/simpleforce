@@ -50,7 +50,7 @@ type QueryResult struct {
 
 // Expose sid to save in admin settings
 func (client *Client) GetSid() (sid string) {
-	return client.sessionID
+        return client.sessionID
 }
 
 //Expose Loc to save in admin settings
@@ -60,8 +60,8 @@ func (client *Client) GetLoc() (loc string) {
 
 // Set SID and Loc as a means to log in without LoginPassword
 func (client *Client) SetSidLoc(sid string, loc string) {
-	client.sessionID = sid
-	client.instanceURL = loc
+        client.sessionID = sid
+        client.instanceURL = loc
 }
 
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
@@ -283,31 +283,19 @@ func (client *Client) SetHttpClient(c *http.Client) {
 
 // DownloadFile downloads a file based on the REST API path given. Saves to filePath.
 func (client *Client) DownloadFile(contentVersionID string, filepath string) error {
-	apiPath := fmt.Sprintf(
-		"/services/data/v%s/sobjects/ContentVersion/%s/VersionData",
-		client.apiVersion,
-		contentVersionID,
-	)
+	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/ContentVersion/%s/VersionData", client.apiVersion, contentVersionID)
 	return client.download(apiPath, filepath)
 }
 
 func (client *Client) DownloadAttachment(attachmentId string, filepath string) error {
-	apiPath := fmt.Sprintf(
-		"/services/data/v%s/sobjects/Attachment/%s/Body",
-		client.apiVersion,
-		attachmentId,
-	)
+	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/Attachment/%s/Body", client.apiVersion, attachmentId)
 	return client.download(apiPath, filepath)
 }
 
 func (client *Client) download(apiPath string, filepath string) error {
 	// Get the data
 	httpClient := client.httpClient
-	req, err := http.NewRequest(
-		"GET",
-		fmt.Sprintf("%s%s", strings.TrimRight(client.instanceURL, "/"), apiPath),
-		nil,
-	)
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s%s", strings.TrimRight(client.instanceURL, "/"), apiPath), nil)
 	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
 	req.Header.Add("Accept", "application/json")
 	req.Header.Add("Authorization", "Bearer "+client.sessionID)
