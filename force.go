@@ -81,7 +81,7 @@ func (client *Client) Query(q string) (*QueryResult, error) {
 		if client.useToolingAPI {
 			formatString = strings.Replace(formatString, "query", "tooling/query", -1)
 		}
-		u = fmt.Sprintf(formatString, baseURL, client.apiVersion, url.PathEscape(q))
+		u = fmt.Sprintf(formatString, baseURL, client.apiVersion, url.QueryEscape(q))
 	}
 
 	data, err := client.httpRequest("GET", u, nil)
