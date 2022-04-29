@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	DefaultAPIVersion = "43.0"
+	DefaultAPIVersion = "54.0"
 	DefaultClientID   = "simpleforce"
 	DefaultURL        = "https://login.salesforce.com"
 
