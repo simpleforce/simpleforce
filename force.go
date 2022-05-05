@@ -2,6 +2,7 @@ package simpleforce
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -21,17 +22,17 @@ const (
 )
 
 type Client interface {
-	Query(query, nextRecordsURL string) (*QueryResult, error)
+	Query(ctx context.Context, query, nextRecordsURL string) (*QueryResult, error)
 
-	DescribeSObject(sobj *SObject) (*SObjectMeta, error)
-	CreateSObject(sobj *SObject, blacklistedFields []string, allowDuplicates bool) error
-	GetSObject(sobj *SObject) error
-	UpdateSObject(sobj *SObject, blacklistedFields []string) error
-	UpsertSObject(sobject *SObject, idField, idValue string, blacklistedFields []string) error
-	DeleteSObject(sobj *SObject) error
+	DescribeSObject(ctx context.Context, sobj *SObject) (*SObjectMeta, error)
+	CreateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string, allowDuplicates bool) error
+	GetSObject(ctx context.Context, sobj *SObject) error
+	UpdateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string) error
+	UpsertSObject(ctx context.Context, sobject *SObject, idField, idValue string, blacklistedFields []string) error
+	DeleteSObject(ctx context.Context, sobj *SObject) error
 
-	DescribeGlobal() (*SObjectMeta, error)
-	DownloadFile(contentVersionID string, filepath string) error
+	DescribeGlobal(ctx context.Context) (*SObjectMeta, error)
+	DownloadFile(ctx context.Context, contentVersionID string, filepath string) error
 }
 
 var _ Client = (*HTTPClient)(nil)
@@ -65,7 +66,7 @@ type QueryResult struct {
 
 // Query runs an SOQL query.
 // nextRecordsURL is used for iterating paginated results.
-func (h *HTTPClient) Query(query, nextRecordsURL string) (*QueryResult, error) {
+func (h *HTTPClient) Query(ctx context.Context, query, nextRecordsURL string) (*QueryResult, error) {
 	var path string
 
 	if len(nextRecordsURL) > 0 {
@@ -77,7 +78,7 @@ func (h *HTTPClient) Query(query, nextRecordsURL string) (*QueryResult, error) {
 
 	url := fmt.Sprintf("%s%s", h.baseURL, path)
 
-	res, err := h.request(http.MethodGet, url, nil, nil)
+	res, err := h.request(ctx, http.MethodGet, url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -95,14 +96,14 @@ func (h *HTTPClient) Query(query, nextRecordsURL string) (*QueryResult, error) {
 
 // DescribeSObject queries the metadata of an SObject using the "describe" API.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/resources_sobject_describe.htm
-func (h *HTTPClient) DescribeSObject(sobj *SObject) (*SObjectMeta, error) {
+func (h *HTTPClient) DescribeSObject(ctx context.Context, sobj *SObject) (*SObjectMeta, error) {
 	if len(sobj.Type()) == 0 {
 		return nil, ErrInvalidSObject{"Type is empty"}
 	}
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/describe")
 
-	res, err := h.request(http.MethodGet, url, nil, nil)
+	res, err := h.request(ctx, http.MethodGet, url, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +126,7 @@ type createSObjectResponse struct {
 // CreateSObject POSTs the JSON representation of the SObject to salesforce to create the entry.
 // If the creation is successful, the ID of the SObject instance is updated with the ID returned.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_sobject_create.htm
-func (h *HTTPClient) CreateSObject(sobj *SObject, blacklistedFields []string, allowDuplicates bool) error {
+func (h *HTTPClient) CreateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string, allowDuplicates bool) error {
 	if len(sobj.Type()) == 0 {
 		return ErrInvalidSObject{"Type is empty"}
 	}
@@ -145,7 +146,7 @@ func (h *HTTPClient) CreateSObject(sobj *SObject, blacklistedFields []string, al
 		headers.Set(duplicateRuleHeader, "allowSave=true")
 	}
 
-	res, err := h.request(http.MethodPost, url, bytes.NewReader(reqData), headers)
+	res, err := h.request(ctx, http.MethodPost, url, bytes.NewReader(reqData), headers)
 	if err != nil {
 		return err
 	}
@@ -168,7 +169,7 @@ func (h *HTTPClient) CreateSObject(sobj *SObject, blacklistedFields []string, al
 }
 
 // GetSObject retrieves all the data fields of an SObject.
-func (h *HTTPClient) GetSObject(sobj *SObject) error {
+func (h *HTTPClient) GetSObject(ctx context.Context, sobj *SObject) error {
 	if len(sobj.Type()) == 0 {
 		return ErrInvalidSObject{"Type is empty"}
 	}
@@ -179,7 +180,7 @@ func (h *HTTPClient) GetSObject(sobj *SObject) error {
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/" + sobj.ID())
 
-	res, err := h.request(http.MethodGet, url, nil, nil)
+	res, err := h.request(ctx, http.MethodGet, url, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -194,7 +195,7 @@ func (h *HTTPClient) GetSObject(sobj *SObject) error {
 }
 
 // UpdateSObject updates SObject in place.
-func (h *HTTPClient) UpdateSObject(sobj *SObject, blacklistedFields []string) error {
+func (h *HTTPClient) UpdateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string) error {
 	if len(sobj.Type()) == 0 {
 		return ErrInvalidSObject{"Type is empty"}
 	}
@@ -212,7 +213,7 @@ func (h *HTTPClient) UpdateSObject(sobj *SObject, blacklistedFields []string) er
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/" + sobj.ID())
 
-	res, err := h.request(http.MethodPatch, url, bytes.NewReader(reqData), nil)
+	res, err := h.request(ctx, http.MethodPatch, url, bytes.NewReader(reqData), nil)
 	if err != nil {
 		return err
 	}
@@ -222,7 +223,7 @@ func (h *HTTPClient) UpdateSObject(sobj *SObject, blacklistedFields []string) er
 }
 
 // UpsertSObject upserts SObject.
-func (h *HTTPClient) UpsertSObject(sobj *SObject, idField, idValue string, blacklistedFields []string) error {
+func (h *HTTPClient) UpsertSObject(ctx context.Context, sobj *SObject, idField, idValue string, blacklistedFields []string) error {
 	if len(sobj.Type()) == 0 {
 		return ErrInvalidSObject{"Type is empty"}
 	}
@@ -236,7 +237,7 @@ func (h *HTTPClient) UpsertSObject(sobj *SObject, idField, idValue string, black
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/" + idField + "/" + idValue)
 
-	res, err := h.request(http.MethodPatch, url, bytes.NewReader(reqData), nil)
+	res, err := h.request(ctx, http.MethodPatch, url, bytes.NewReader(reqData), nil)
 	if err != nil {
 		return err
 	}
@@ -246,7 +247,7 @@ func (h *HTTPClient) UpsertSObject(sobj *SObject, idField, idValue string, black
 }
 
 // DeleteSObject deletes an SObject record.
-func (h *HTTPClient) DeleteSObject(sobj *SObject) error {
+func (h *HTTPClient) DeleteSObject(ctx context.Context, sobj *SObject) error {
 	if len(sobj.Type()) == 0 {
 		return ErrInvalidSObject{"Type is empty"}
 	}
@@ -257,7 +258,7 @@ func (h *HTTPClient) DeleteSObject(sobj *SObject) error {
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/" + sobj.ID())
 
-	_, err := h.request(http.MethodDelete, url, nil, nil)
+	_, err := h.request(ctx, http.MethodDelete, url, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -266,8 +267,8 @@ func (h *HTTPClient) DeleteSObject(sobj *SObject) error {
 }
 
 // httpRequest executes an HTTP request to the salesforce server and returns the HTTP response.
-func (h *HTTPClient) request(method, url string, body io.Reader, headers http.Header) (*http.Response, error) {
-	req, err := http.NewRequest(method, url, body)
+func (h *HTTPClient) request(ctx context.Context, method, url string, body io.Reader, headers http.Header) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, method, url, body)
 	if err != nil {
 		return nil, err
 	}
@@ -309,7 +310,7 @@ func (h *HTTPClient) makeURL(url string) string {
 }
 
 // DownloadFile downloads a file based on the REST API path given. Saves to filePath.
-func (h *HTTPClient) DownloadFile(contentVersionID string, filepath string) error {
+func (h *HTTPClient) DownloadFile(ctx context.Context, contentVersionID string, filepath string) error {
 	path := fmt.Sprintf("/services/data/%s/sobjects/ContentVersion/%s/VersionData", h.apiVersion, contentVersionID)
 	url := fmt.Sprintf("%s%s", h.baseURL, path)
 
@@ -317,7 +318,7 @@ func (h *HTTPClient) DownloadFile(contentVersionID string, filepath string) erro
 	headers.Set("Content-Type", "application/json; charset=UTF-8")
 	headers.Set("Accept", "application/json")
 
-	res, err := h.request(http.MethodGet, url, nil, headers)
+	res, err := h.request(ctx, http.MethodGet, url, nil, headers)
 	if err != nil {
 		return err
 	}
@@ -335,7 +336,7 @@ func (h *HTTPClient) DownloadFile(contentVersionID string, filepath string) erro
 }
 
 // DescribeGlobal lists all available objects and their metadata.
-func (h *HTTPClient) DescribeGlobal() (*SObjectMeta, error) {
+func (h *HTTPClient) DescribeGlobal(ctx context.Context) (*SObjectMeta, error) {
 	path := fmt.Sprintf("/services/data/%s/sobjects", h.apiVersion)
 	url := fmt.Sprintf("%s%s", h.baseURL, path)
 
@@ -343,7 +344,7 @@ func (h *HTTPClient) DescribeGlobal() (*SObjectMeta, error) {
 	headers.Set("Content-Type", "application/json; charset=UTF-8")
 	headers.Set("Accept", "application/json")
 
-	res, err := h.request(http.MethodGet, url, nil, headers)
+	res, err := h.request(ctx, http.MethodGet, url, nil, headers)
 	if err != nil {
 		return nil, err
 	}

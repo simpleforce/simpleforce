@@ -1,6 +1,7 @@
 package simpleforce
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +33,7 @@ func TestHTTPClient_Query(t *testing.T) {
 		Records: []*SObject{sObj},
 	}
 
-	actualRes, err := client.Query(query, "")
+	actualRes, err := client.Query(context.Background(), query, "")
 	assert.NoError(err)
 	assert.Equal(res, actualRes)
 }
@@ -63,7 +64,7 @@ func TestHTTPClient_Query_nextRecordsURL(t *testing.T) {
 		Records:        []*SObject{sObj},
 	}
 
-	actualRes, err := client.Query(query, nextRecordsURL)
+	actualRes, err := client.Query(context.Background(), query, nextRecordsURL)
 	assert.NoError(err)
 	assert.Equal(res, actualRes)
 }
@@ -87,7 +88,7 @@ func TestHTTPClient_DescribeSObject(t *testing.T) {
 
 	sobj := NewSObject("Case")
 
-	meta, err := client.DescribeSObject(sobj)
+	meta, err := client.DescribeSObject(context.Background(), sobj)
 	assert.NoError(err)
 	assert.NotNil(meta)
 
@@ -116,7 +117,7 @@ func TestHTTPClient_Get(t *testing.T) {
 
 	client := NewHTTPClient(ts.Client(), ts.URL, DefaultAPIVersion)
 
-	err := client.GetSObject(sobj)
+	err := client.GetSObject(context.Background(), sobj)
 	assert.NoError(err)
 	assert.NotNil(sobj)
 
@@ -151,7 +152,7 @@ func TestHTTPClient_Create(t *testing.T) {
 		SetID(id).
 		Set("OwnerId", ownerID)
 
-	err := client.CreateSObject(sobj, nil, false)
+	err := client.CreateSObject(context.Background(), sobj, nil, false)
 	assert.NoError(err)
 	assert.NotNil(sobj)
 
@@ -186,7 +187,7 @@ func TestHTTPClient_Create_allow_duplicates(t *testing.T) {
 		SetID(id).
 		Set("OwnerId", ownerID)
 
-	err := client.CreateSObject(sobj, nil, true)
+	err := client.CreateSObject(context.Background(), sobj, nil, true)
 	assert.NoError(err)
 	assert.NotNil(sobj)
 
@@ -221,7 +222,7 @@ func TestHTTPClient_Update(t *testing.T) {
 
 	sobj.Set("Foo", "bar")
 
-	err := client.UpdateSObject(sobj, nil)
+	err := client.UpdateSObject(context.Background(), sobj, nil)
 	assert.NoError(err)
 
 	assert.Equal(ownerID, sobj.StringField("OwnerId"))
@@ -256,7 +257,7 @@ func TestHTTPClient_Upsert(t *testing.T) {
 
 	client := NewHTTPClient(ts.Client(), ts.URL, DefaultAPIVersion)
 
-	err := client.UpsertSObject(sobj, idField, idValue, nil)
+	err := client.UpsertSObject(context.Background(), sobj, idField, idValue, nil)
 	assert.NoError(err)
 
 	assert.Equal(ownerID, sobj.StringField("OwnerId"))
@@ -279,6 +280,6 @@ func TestHTTPClient_Delete(t *testing.T) {
 
 	client := NewHTTPClient(ts.Client(), ts.URL, DefaultAPIVersion)
 
-	err := client.DeleteSObject(sobj)
+	err := client.DeleteSObject(context.Background(), sobj)
 	assert.NoError(err)
 }
