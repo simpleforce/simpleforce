@@ -236,7 +236,7 @@ func (obj *SObject) Delete(id ...string) error {
 		return ErrFailure
 	}
 
-	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + obj.ID())
+	url := obj.client().makeURL("sobjects/" + obj.Type() + "/" + oid)
 	log.Println(url)
 	_, err := obj.client().httpRequest(http.MethodDelete, url, nil)
 	if err != nil {
