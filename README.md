@@ -230,6 +230,27 @@ if err != nil {
 }
 ```
 
+### Execute ApexREST
+
+```go
+// Setup client and login
+// ...
+
+// import net/url for url encoding
+accountName := url.QueryEscape("SomeAccountName")
+
+method := "GET"
+path := "/services/data/v54.0/parameterizedSearch/?q=" + accountName + "&sobject=Account&&Account.fields=id,name&Account.limit=5"
+// Change method and populate payload as needed.
+payload := nil
+
+result, err := client.ApexREST(method, path, payload)
+if err != nil {
+     // handle error
+     return
+}
+```
+
 ## Development and Unit Test
 
 A set of unit test cases are provided to validate the basic functions of simpleforce. Please do not run these
