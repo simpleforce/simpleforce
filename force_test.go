@@ -18,6 +18,14 @@ var (
 			return DefaultURL
 		}
 	}()
+	sfClientId = func() string {
+		if os.ExpandEnv("${SF_CLIENT_ID}") != "" {
+			return os.ExpandEnv("${SF_CLIENT_ID}")
+		} else {
+			return DefaultClientID
+		}
+	}
+	sfClientSecret = os.ExpandEnv("${SF_CLIENT_SECRET}")
 )
 
 func checkCredentialsAndSkip(t *testing.T) {
@@ -32,7 +40,7 @@ func requireClient(t *testing.T, skippable bool) *Client {
 		checkCredentialsAndSkip(t)
 	}
 
-	client := NewClient(sfURL, DefaultClientID, DefaultAPIVersion)
+	client := NewClient(sfURL, sfClientId(), DefaultAPIVersion)
 	if client == nil {
 		t.Fail()
 	}
@@ -173,6 +181,18 @@ func TestClient_QueryLike(t *testing.T) {
 		if !strings.Contains(case0.StringField("Subject"), "simpleforce") {
 			t.FailNow()
 		}
+	}
+}
+
+func TestClient_IntrospectToken(t *testing.T) {
+	client := requireClient(t, true)
+
+	result, err := client.IntrospectSessionToken(sfClientSecret)
+	if err != nil {
+		log.Println(logPrefix, "introspect failed,", err)
+		t.FailNow()
+	} else {
+		log.Println(logPrefix, result.Active)
 	}
 }
 
