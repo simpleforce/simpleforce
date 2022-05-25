@@ -48,9 +48,22 @@ type QueryResult struct {
 	Records        []SObject `json:"records"`
 }
 
+type IntrospectResult struct {
+	Active      bool   `json:"active"`
+	Scope       string `json:"scope"`
+	ClientId    string `json:"client_id"`
+	Username    string `json:"username"`
+	Sub         string `json:"sub"`
+	TokenType   string `json:"token_type"`
+	SessionType string `json:"session_type"`
+	Exp         int    `json:"exp"`
+	Iat         int    `json:"iat"`
+	Nbf         int    `json:"nbf"`
+}
+
 // Expose sid to save in admin settings
 func (client *Client) GetSid() (sid string) {
-        return client.sessionID
+	return client.sessionID
 }
 
 //Expose Loc to save in admin settings
@@ -60,8 +73,8 @@ func (client *Client) GetLoc() (loc string) {
 
 // Set SID and Loc as a means to log in without LoginPassword
 func (client *Client) SetSidLoc(sid string, loc string) {
-        client.sessionID = sid
-        client.instanceURL = loc
+	client.sessionID = sid
+	client.instanceURL = loc
 }
 
 // Query runs an SOQL query. q could either be the SOQL string or the nextRecordsURL.
@@ -362,4 +375,35 @@ func (client *Client) DescribeGlobal() (*SObjectMeta, error) {
 		return nil, err
 	}
 	return &meta, nil
+}
+
+func (client *Client) IntrospectSessionToken(clientSecret string) (*IntrospectResult, error) {
+	baseURL := strings.TrimRight(client.baseURL, "/")
+	introspectURL := fmt.Sprintf("%s/services/oauth2/introspect", baseURL)
+
+	httpClient := client.httpClient
+	data := url.Values{
+		"token":           {client.sessionID},
+		"client_id":       {client.clientID},
+		"client_secret":   {clientSecret},
+		"token_type_hint": {"access_token"},
+	}
+
+	resp, err := httpClient.PostForm(introspectURL, data)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	respData, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	var introspectResult IntrospectResult
+	err = json.Unmarshal(respData, &introspectResult)
+	if err != nil {
+		return nil, err
+	}
+	return &introspectResult, nil
 }
