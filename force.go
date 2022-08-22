@@ -281,6 +281,35 @@ func (client *Client) SetHttpClient(c *http.Client) {
 	client.httpClient = c
 }
 
+func (client *Client) GetFileContent(apiPath string) ([]byte, error) {
+	// Get the data
+	httpClient := client.httpClient
+	req, err := http.NewRequest("GET", fmt.Sprintf("%s%s", strings.TrimRight(client.instanceURL, "/"), apiPath), nil)
+	req.Header.Add("Content-Type", "application/json; charset=UTF-8")
+	req.Header.Add("Accept", "application/json")
+	req.Header.Add("Authorization", "Bearer "+client.sessionID)
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
+		buf := new(bytes.Buffer)
+		buf.ReadFrom(resp.Body)
+		return nil, fmt.Errorf("ERROR: statuscode: %d, body: %s", resp.StatusCode, buf.String())
+	}
+
+	var content []byte
+	content, err = io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	return content, nil
+}
+
 // DownloadFile downloads a file based on the REST API path given. Saves to filePath.
 func (client *Client) DownloadFile(contentVersionID string, filepath string) error {
 	apiPath := fmt.Sprintf("/services/data/v%s/sobjects/ContentVersion/%s/VersionData", client.apiVersion, contentVersionID)
