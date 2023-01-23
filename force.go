@@ -335,7 +335,7 @@ func parseHost(input string) string {
 //Get the List of all available objects and their metadata for your organization's data
 func (client *Client) DescribeGlobal() (*SObjectMeta, error) {
 	apiPath := fmt.Sprintf("/services/data/v%s/sobjects", client.apiVersion)
-	baseURL := strings.TrimRight(client.baseURL, "/")
+	baseURL := strings.TrimRight(client.instanceURL, "/")
 	url := fmt.Sprintf("%s%s", baseURL, apiPath) // Get the objects
 	httpClient := client.httpClient
 	req, err := http.NewRequest("GET", url, nil)
