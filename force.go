@@ -18,16 +18,17 @@ const (
 
 	logPrefix = "[simpleforce]"
 
-	duplicateRuleHeader = "Sforce-Duplicate-Rule-Header"
+	duplicateRuleHeader         = "Sforce-Duplicate-Rule-Header"
+	autoAssignRuleHeader string = "Sforce-Auto-Assign"
 )
 
 type Client interface {
 	Query(ctx context.Context, query, nextRecordsURL string) (*QueryResult, error)
 
 	DescribeSObject(ctx context.Context, sobj *SObject) (*SObjectMeta, error)
-	CreateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string, allowDuplicates bool) error
+	CreateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string, allowDuplicates bool, autoAssign *bool) error
 	GetSObject(ctx context.Context, sobj *SObject) error
-	UpdateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string) error
+	UpdateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string, autoAssign *bool) error
 	UpsertSObject(ctx context.Context, sobject *SObject, idField, idValue string, blacklistedFields []string) error
 	DeleteSObject(ctx context.Context, sobj *SObject) error
 
@@ -126,7 +127,7 @@ type createSObjectResponse struct {
 // CreateSObject POSTs the JSON representation of the SObject to salesforce to create the entry.
 // If the creation is successful, the ID of the SObject instance is updated with the ID returned.
 // Ref: https://developer.salesforce.com/docs/atlas.en-us.214.0.api_rest.meta/api_rest/dome_sobject_create.htm
-func (h *HTTPClient) CreateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string, allowDuplicates bool) error {
+func (h *HTTPClient) CreateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string, allowDuplicates bool, autoAssign *bool) error {
 	if len(sobj.Type()) == 0 {
 		return ErrInvalidSObject{"Type is empty"}
 	}
@@ -140,10 +141,17 @@ func (h *HTTPClient) CreateSObject(ctx context.Context, sobj *SObject, blacklist
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/")
 
-	var headers http.Header
+	headers := http.Header{}
 	if allowDuplicates {
-		headers = http.Header{}
 		headers.Set(duplicateRuleHeader, "allowSave=true")
+	}
+	if autoAssign != nil {
+		autoAssignValue := "FALSE"
+		if *autoAssign {
+			autoAssignValue = "TRUE"
+		}
+
+		headers.Set(autoAssignRuleHeader, autoAssignValue)
 	}
 
 	res, err := h.request(ctx, http.MethodPost, url, bytes.NewReader(reqData), headers)
@@ -195,7 +203,7 @@ func (h *HTTPClient) GetSObject(ctx context.Context, sobj *SObject) error {
 }
 
 // UpdateSObject updates SObject in place.
-func (h *HTTPClient) UpdateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string) error {
+func (h *HTTPClient) UpdateSObject(ctx context.Context, sobj *SObject, blacklistedFields []string, autoAssign *bool) error {
 	if len(sobj.Type()) == 0 {
 		return ErrInvalidSObject{"Type is empty"}
 	}
@@ -213,7 +221,17 @@ func (h *HTTPClient) UpdateSObject(ctx context.Context, sobj *SObject, blacklist
 
 	url := h.makeURL("sobjects/" + sobj.Type() + "/" + sobj.ID())
 
-	res, err := h.request(ctx, http.MethodPatch, url, bytes.NewReader(reqData), nil)
+	headers := http.Header{}
+	if autoAssign != nil {
+		autoAssignValue := "FALSE"
+		if *autoAssign {
+			autoAssignValue = "TRUE"
+		}
+
+		headers.Set(autoAssignRuleHeader, autoAssignValue)
+	}
+
+	res, err := h.request(ctx, http.MethodPatch, url, bytes.NewReader(reqData), headers)
 	if err != nil {
 		return err
 	}
